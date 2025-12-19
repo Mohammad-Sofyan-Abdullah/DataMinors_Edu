@@ -16,12 +16,16 @@ import {
   AlertCircle,
   PlayCircle,
   Menu,
-  X
+  X,
+  MessageSquare,
+  BookOpen,
+  Layers
 } from 'lucide-react';
 import { youtubeAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../components/LoadingSpinner';
+import Flashcard from '../components/Flashcard';
 
 const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOpen = true, onToggleSidebar }) => {
   const queryClient = useQueryClient();
@@ -32,6 +36,11 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [activeTab, setActiveTab] = useState('chat'); // 'chat', 'summaries', 'flashcards'
+  const [flashcards, setFlashcards] = useState([]);
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
+  const [isExplainingCard, setIsExplainingCard] = useState(false);
 
   // Fetch all sessions
   const { } = useQuery(
@@ -55,6 +64,15 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
       enabled: !!selectedSessionId,
       onSuccess: (data) => {
         setSelectedSession(data);
+        // Always update flashcards based on the current session
+        if (data.flashcards && data.flashcards.length > 0) {
+          setFlashcards(data.flashcards);
+        } else {
+          // Clear flashcards if the current session doesn't have any
+          setFlashcards([]);
+        }
+        // Reset to first card when switching sessions
+        setCurrentCardIndex(0);
       },
       onError: (error) => {
         console.error('Error fetching session:', error);
@@ -202,6 +220,52 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
       return `${minutes}m ${secs}s`;
     } else {
       return `${secs}s`;
+    }
+  };
+
+  const handleGenerateFlashcards = async () => {
+    if (!selectedSessionId) return;
+    
+    setIsGeneratingFlashcards(true);
+    try {
+      // Request 15 as a guide, but AI will determine optimal count based on content
+      const response = await youtubeAPI.generateFlashcards(selectedSessionId, 15);
+      setFlashcards(response.data.flashcards);
+      setCurrentCardIndex(0);
+      const count = response.data.count;
+      toast.success(`Generated ${count} high-quality flashcard${count !== 1 ? 's' : ''}!`);
+      queryClient.invalidateQueries(['youtube-session', selectedSessionId]);
+    } catch (error) {
+      toast.error('Failed to generate flashcards');
+    } finally {
+      setIsGeneratingFlashcards(false);
+    }
+  };
+
+  const handleExplainFlashcard = async (question, answer) => {
+    if (!selectedSessionId) return null;
+    
+    setIsExplainingCard(true);
+    try {
+      const response = await youtubeAPI.explainFlashcard(selectedSessionId, question, answer);
+      return response.data.explanation;
+    } catch (error) {
+      toast.error('Failed to get explanation');
+      return null;
+    } finally {
+      setIsExplainingCard(false);
+    }
+  };
+
+  const handleNextCard = () => {
+    if (currentCardIndex < flashcards.length - 1) {
+      setCurrentCardIndex(currentCardIndex + 1);
+    }
+  };
+
+  const handlePreviousCard = () => {
+    if (currentCardIndex > 0) {
+      setCurrentCardIndex(currentCardIndex - 1);
     }
   };
 
@@ -424,136 +488,296 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden flex">
-        {/* Summaries Sidebar - Always show when session is selected */}
-        {selectedSessionId && (
-          <div className={`${isSidebarOpen ? 'w-80' : 'w-1/3 min-w-96'} border-r border-gray-200 flex flex-col transition-all duration-300`}>
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Summaries</h2>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
-              {/* Short Summary */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-gray-900">Quick Summary</h3>
-                  <button
-                    onClick={() => copyToClipboard(selectedSession.short_summary)}
-                    className="p-1 text-gray-400 hover:text-gray-600"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="prose prose-sm max-w-none text-sm text-gray-700">
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]}
-                  >
-                    {selectedSession.short_summary}
-                  </ReactMarkdown>
-                </div>
-              </div>
-              
-              {/* Detailed Summary */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-gray-900">Detailed Summary</h3>
-                  <button
-                    onClick={() => copyToClipboard(selectedSession.detailed_summary)}
-                    className="p-1 text-gray-400 hover:text-gray-600"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="prose prose-sm max-w-none text-sm text-gray-700">
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]}
-                  >
-                    {selectedSession.detailed_summary}
-                  </ReactMarkdown>
-                </div>
-              </div>
-            </div>
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {/* Tabs */}
+        <div className="border-b border-gray-200 bg-white">
+          <div className="flex space-x-1 p-2">
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'chat'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <MessageSquare size={18} />
+              Chat
+            </button>
+            <button
+              onClick={() => setActiveTab('summaries')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'summaries'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <Layers size={18} />
+              Summaries
+            </button>
+            <button
+              onClick={() => setActiveTab('flashcards')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'flashcards'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <BookOpen size={18} />
+              Flashcards
+              {flashcards.length > 0 && (
+                <span className="ml-1 px-2 py-0.5 text-xs bg-blue-600 text-white rounded-full">
+                  {flashcards.length}
+                </span>
+              )}
+            </button>
           </div>
-        )}
+        </div>
 
-        {/* Chat Interface */}
-        <div className="flex-1 flex flex-col">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {selectedSession.chat_history?.length > 0 ? (
-              selectedSession.chat_history.map((message, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-3xl rounded-lg px-4 py-3 ${
-                      message.role === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-900'
-                    }`}
-                  >
-                    <div className="text-sm prose prose-sm max-w-none">
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
-                    </div>
-                    {message.timestamp && (
-                      <div className={`text-xs mt-1 ${
-                        message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
-                      }`}>
-                        {new Date(message.timestamp).toLocaleTimeString()}
+        {/* Tab Content */}
+        <div className="flex-1 overflow-hidden flex">
+          {/* Chat Tab */}
+          {activeTab === 'chat' && (
+            <div className="flex-1 flex">
+              {/* Summaries Sidebar - Show in chat tab when sidebar is closed */}
+              {!isSidebarOpen && (
+                <div className="w-1/3 min-w-96 border-r border-gray-200 flex flex-col">
+                  <div className="p-4 border-b border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-900">Summaries</h2>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                    {/* Short Summary */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-medium text-gray-900">Quick Summary</h3>
+                        <button
+                          onClick={() => copyToClipboard(selectedSession.short_summary)}
+                          className="p-1 text-gray-400 hover:text-gray-600"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
                       </div>
-                    )}
+                      <div className="prose prose-sm max-w-none text-sm text-gray-700">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {selectedSession.short_summary}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                    
+                    {/* Detailed Summary */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-medium text-gray-900">Detailed Summary</h3>
+                        <button
+                          onClick={() => copyToClipboard(selectedSession.detailed_summary)}
+                          className="p-1 text-gray-400 hover:text-gray-600"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="prose prose-sm max-w-none text-sm text-gray-700">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {selectedSession.detailed_summary}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
                   </div>
-                </motion.div>
-              ))
-            ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                    <Send className="h-8 w-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Start asking questions
-                  </h3>
-                  <p className="text-gray-500 max-w-sm">
-                    Ask any question about the video content and get detailed answers based on the transcript.
-                  </p>
+                </div>
+              )}
+
+              {/* Chat Interface */}
+              <div className="flex-1 flex flex-col">
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {selectedSession.chat_history?.length > 0 ? (
+                    selectedSession.chat_history.map((message, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-3xl rounded-lg px-4 py-3 ${
+                            message.role === 'user'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-100 text-gray-900'
+                          }`}
+                        >
+                          <div className="text-sm prose prose-sm max-w-none">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {message.content}
+                            </ReactMarkdown>
+                          </div>
+                          {message.timestamp && (
+                            <div className={`text-xs mt-1 ${
+                              message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
+                            }`}>
+                              {new Date(message.timestamp).toLocaleTimeString()}
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                          <Send className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                          Start asking questions
+                        </h3>
+                        <p className="text-gray-500 max-w-sm">
+                          Ask any question about the video content and get detailed answers based on the transcript.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input */}
+                <div className="border-t border-gray-200 p-4">
+                  <form onSubmit={handleQuestionSubmit} className="flex space-x-3">
+                    <input
+                      type="text"
+                      value={currentQuestion}
+                      onChange={(e) => setCurrentQuestion(e.target.value)}
+                      placeholder="Ask a question about the video..."
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      disabled={chatMutation.isLoading}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!currentQuestion.trim() || chatMutation.isLoading}
+                      className="btn-primary btn-md flex items-center"
+                    >
+                      {chatMutation.isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </button>
+                  </form>
                 </div>
               </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
+            </div>
+          )}
 
-          {/* Input */}
-          <div className="border-t border-gray-200 p-4">
-            <form onSubmit={handleQuestionSubmit} className="flex space-x-3">
-              <input
-                type="text"
-                value={currentQuestion}
-                onChange={(e) => setCurrentQuestion(e.target.value)}
-                placeholder="Ask a question about the video..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                disabled={chatMutation.isLoading}
-              />
-              <button
-                type="submit"
-                disabled={!currentQuestion.trim() || chatMutation.isLoading}
-                className="btn-primary btn-md flex items-center"
-              >
-                {chatMutation.isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+          {/* Summaries Tab */}
+          {activeTab === 'summaries' && (
+            <div className="flex-1 overflow-y-auto p-8">
+              <div className="max-w-4xl mx-auto space-y-8">
+                {/* Short Summary */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold text-gray-900">Quick Summary</h2>
+                    <button
+                      onClick={() => copyToClipboard(selectedSession.short_summary)}
+                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                    >
+                      <Copy className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="prose prose-base max-w-none text-gray-700">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {selectedSession.short_summary}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+                
+                {/* Detailed Summary */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold text-gray-900">Detailed Summary</h2>
+                    <button
+                      onClick={() => copyToClipboard(selectedSession.detailed_summary)}
+                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                    >
+                      <Copy className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="prose prose-base max-w-none text-gray-700">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {selectedSession.detailed_summary}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Flashcards Tab */}
+          {activeTab === 'flashcards' && (
+            <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-gray-50 to-gray-100">
+              <div className="max-w-4xl mx-auto">
+                {flashcards.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="mx-auto w-20 h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mb-6">
+                      <BookOpen className="h-10 w-10 text-purple-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                      Generate Flashcards
+                    </h2>
+                    <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                      AI will create high-quality flashcards based on the concepts explained in this video. The number of cards will be optimized for learning quality.
+                    </p>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleGenerateFlashcards}
+                      disabled={isGeneratingFlashcards}
+                      className="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 mx-auto"
+                    >
+                      {isGeneratingFlashcards ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          Generating Flashcards...
+                        </>
+                      ) : (
+                        <>
+                          <BookOpen className="h-5 w-5" />
+                          Generate Flashcards
+                        </>
+                      )}
+                    </motion.button>
+                  </div>
                 ) : (
-                  <Send className="h-4 w-4" />
+                  <div className="space-y-6">
+                    <div className="text-center mb-8">
+                      <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                        Study Flashcards
+                      </h2>
+                      <p className="text-gray-600">
+                        Review the key concepts from this video
+                      </p>
+                    </div>
+                    
+                    <Flashcard
+                      flashcard={flashcards[currentCardIndex]}
+                      cardNumber={currentCardIndex + 1}
+                      totalCards={flashcards.length}
+                      onNext={handleNextCard}
+                      onPrevious={handlePreviousCard}
+                      onExplain={handleExplainFlashcard}
+                      isExplaining={isExplainingCard}
+                    />
+
+                    <div className="text-center mt-8">
+                      <button
+                        onClick={handleGenerateFlashcards}
+                        disabled={isGeneratingFlashcards}
+                        className="text-sm text-gray-600 hover:text-gray-900 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isGeneratingFlashcards ? 'Regenerating...' : 'Regenerate Flashcards'}
+                      </button>
+                    </div>
+                  </div>
                 )}
-              </button>
-            </form>
-          </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

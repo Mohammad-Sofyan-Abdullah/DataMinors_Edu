@@ -211,7 +211,9 @@ export const youtubeAPI = {
   regenerateSummaries: (sessionId) => longRunningApi.post(`/youtube/sessions/${sessionId}/regenerate-summaries`),
   exportSession: (sessionId, format) => api.get(`/youtube/sessions/${sessionId}/export/${format}`, {
     responseType: 'blob'
-  })
+  }),
+  generateFlashcards: (sessionId, count = 10) => api.post(`/youtube/sessions/${sessionId}/flashcards`, { count }),
+  explainFlashcard: (sessionId, question, answer) => api.post(`/youtube/sessions/${sessionId}/flashcards/explain`, { question, answer })
 };
 
 // Messages API
