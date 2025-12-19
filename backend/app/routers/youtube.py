@@ -1,17 +1,18 @@
 """
 YouTube Summarizer API Routes
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from typing import List, Optional
 from datetime import datetime
 from app.models import (
     YouTubeSession, YouTubeSessionCreate, YouTubeSessionUpdate, 
-    YouTubeSessionInDB, YouTubeChatMessage, UserInDB
+    YouTubeSessionInDB, YouTubeChatMessage, UserInDB, Flashcard
 )
 from app.auth import get_current_active_user
 from app.database import get_database
 from app.youtube_service import youtube_service
 from app.export_service import export_service
+from app.ai_service import ai_service
 from bson import ObjectId
 from fastapi.responses import StreamingResponse
 import logging
@@ -410,3 +411,149 @@ async def export_session(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to export: {str(e)}"
         )
+
+@router.post("/sessions/{session_id}/flashcards")
+async def generate_flashcards(
+    session_id: str,
+    count: int = Body(10, embed=True),
+    current_user: UserInDB = Depends(get_current_active_user),
+    db = Depends(get_database)
+):
+    """Generate flashcards for a YouTube session"""
+    try:
+        session_object_id = ObjectId(session_id)
+    except:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid session ID"
+        )
+    
+    # Get session
+    session = await db.youtube_sessions.find_one({
+        "_id": session_object_id,
+        "user_id": current_user.id
+    })
+    
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+    
+    if not session.get("transcript"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No transcript available for this session"
+        )
+    
+    if not session.get("short_summary") or not session.get("detailed_summary"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No summaries available for this session. Please regenerate summaries first."
+        )
+    
+    try:
+        # Generate flashcards using AI service
+        # Let AI decide optimal count based on content quality (5-25 range)
+        # Don't force a minimum - quality over quantity
+        requested_count = min(count, 25) if count else 15
+        flashcards_data = await ai_service.generate_flashcards(
+            short_summary=session["short_summary"],
+            detailed_summary=session["detailed_summary"],
+            video_title=session["video_title"],
+            count=requested_count
+        )
+        
+        # Convert to Flashcard models
+        flashcards = [Flashcard(**card) for card in flashcards_data]
+        
+        # Update session with flashcards
+        await db.youtube_sessions.update_one(
+            {"_id": session_object_id},
+            {
+                "$set": {
+                    "flashcards": [card.dict() for card in flashcards],
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        logger.info(f"Generated {len(flashcards)} flashcards for session {session_id}")
+        
+        return {
+            "flashcards": flashcards,
+            "count": len(flashcards)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating flashcards: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate flashcards: {str(e)}"
+        )
+
+@router.post("/sessions/{session_id}/flashcards/explain")
+async def explain_flashcard(
+    session_id: str,
+    question: str = Body(..., embed=True),
+    answer: str = Body(..., embed=True),
+    current_user: UserInDB = Depends(get_current_active_user),
+    db = Depends(get_database)
+):
+    """Get AI explanation for a specific flashcard"""
+    try:
+        session_object_id = ObjectId(session_id)
+    except:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid session ID"
+        )
+    
+    # Get session
+    session = await db.youtube_sessions.find_one({
+        "_id": session_object_id,
+        "user_id": current_user.id
+    })
+    
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+    
+    if not session.get("transcript") and not session.get("detailed_summary"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No content available for this session"
+        )
+    
+    try:
+        # Use detailed summary as context if available, otherwise use transcript
+        # Summary is preferred as it covers the whole video and extracts key concepts
+        context = session.get("detailed_summary")
+        if not context:
+            # Fallback to transcript, truncated to fit context window
+            # Llama 3 has 8k context, so ~20k chars is safe-ish, but let's stick to 15k
+            context = session.get("transcript", "")[:15000]
+
+        # Generate detailed explanation
+        explanation = await ai_service.explain_flashcard_answer(
+            question=question,
+            answer=answer,
+            context=context,
+            video_title=session["video_title"]
+        )
+        
+        return {
+            "question": question,
+            "answer": answer,
+            "explanation": explanation
+        }
+        
+    except Exception as e:
+        logger.error(f"Error explaining flashcard: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate explanation: {str(e)}"
+        )
+

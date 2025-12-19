@@ -211,6 +211,15 @@ class YouTubeChatMessage(BaseModel):
     content: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
+class Flashcard(BaseModel):
+    question: str
+    answer: str
+    explanation: Optional[str] = None
+
+class FlashcardSet(BaseModel):
+    flashcards: List[Flashcard]
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+
 class YouTubeSessionBase(BaseModel):
     video_url: str
     video_title: Optional[str] = None
@@ -219,6 +228,7 @@ class YouTubeSessionBase(BaseModel):
     short_summary: Optional[str] = None
     detailed_summary: Optional[str] = None
     chat_history: List[YouTubeChatMessage] = []
+    flashcards: Optional[List[Flashcard]] = []
 
 class YouTubeSessionCreate(YouTubeSessionBase):
     pass
