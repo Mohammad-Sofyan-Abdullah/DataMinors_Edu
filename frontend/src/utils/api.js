@@ -255,6 +255,21 @@ export const marketplaceAPI = {
   getLeaderboard: (limit = 10) => api.get('/marketplace/leaderboard', { params: { limit } }),
 };
 
+// Notes API
+export const notesAPI = {
+  getDocuments: (params = {}) => api.get('/notes/documents', { params }),
+  createDocument: (documentData) => api.post('/notes/documents', documentData),
+  getDocument: (documentId) => api.get(`/notes/documents/${documentId}`),
+  updateDocument: (documentId, documentData) => api.put(`/notes/documents/${documentId}`, documentData),
+  deleteDocument: (documentId) => api.delete(`/notes/documents/${documentId}`),
+  uploadDocument: (formData) => api.post('/notes/documents/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  chatWithDocument: (documentId, message) => api.post(`/notes/documents/${documentId}/chat`, { message }),
+  generateNotes: (documentId, prompt) => api.post(`/notes/documents/${documentId}/generate-notes`, { prompt }),
+  getChatHistory: (documentId) => api.get(`/notes/documents/${documentId}/chat-history`),
+};
+
 export default api;
 
 

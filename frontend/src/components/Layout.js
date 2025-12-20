@@ -59,6 +59,7 @@ const Layout = () => {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
+    { name: 'Notes', href: '/notes', icon: BookOpen },
     { name: 'Marketplace', href: '/marketplace', icon: ShoppingBag },
     { name: 'Messages', href: '/messages', icon: MessageSquare },
     { name: 'YouTube Summarizer', href: '/youtube-summarizer', icon: Youtube },

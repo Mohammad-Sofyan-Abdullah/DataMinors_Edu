@@ -485,11 +485,21 @@ async def generate_flashcards(
             "count": len(flashcards)
         }
         
+    except ValueError as e:
+        # Handle specific flashcard generation errors
+        logger.error(f"Flashcard generation failed: {e}")
+        return {
+            "flashcards": [],
+            "count": 0,
+            "message": "Flashcards not available right now. Please try again later or with a different video.",
+            "error": str(e)
+        }
+        
     except Exception as e:
-        logger.error(f"Error generating flashcards: {e}")
+        logger.error(f"Unexpected error generating flashcards: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate flashcards: {str(e)}"
+            detail="An unexpected error occurred while generating flashcards"
         )
 
 @router.post("/sessions/{session_id}/flashcards/explain")

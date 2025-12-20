@@ -13,7 +13,7 @@ class AIService:
         """Moderate a message for inappropriate content"""
         try:
             response = self.client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="openai/gpt-oss-120b",
                 messages=[
                     {
                         "role": "system",
@@ -69,7 +69,7 @@ class AIService:
             chat_text = "\n".join(formatted_messages[-50:])  # Last 50 messages
             
             response = self.client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="openai/gpt-oss-120b",
                 messages=[
                     {
                         "role": "system",
@@ -104,7 +104,7 @@ class AIService:
         """Suggest classroom names based on description"""
         try:
             response = self.client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="openai/gpt-oss-120b",
                 messages=[
                     {
                         "role": "system",
@@ -138,7 +138,7 @@ class AIService:
         """Suggest room names for a classroom"""
         try:
             response = self.client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="openai/gpt-oss-120b",
                 messages=[
                     {
                         "role": "system",
@@ -172,155 +172,159 @@ class AIService:
             return ["General Discussion", "Study Notes", "Q&A Hub", "Resources", "Homework Help"]
 
     async def generate_flashcards(self, short_summary: str, detailed_summary: str, video_title: str, count: int = 15) -> list:
-        """Generate concept-focused flashcards from video summaries"""
+        """Generate knowledge-testing flashcards from video summaries"""
         try:
+            # Validate input summaries - be more lenient
+            if not detailed_summary or len(detailed_summary.strip()) < 20:
+                logger.warning(f"Detailed summary too short ({len(detailed_summary) if detailed_summary else 0} chars)")
+                raise ValueError("Video summary is too short to generate meaningful flashcards")
+            
             # Calculate suggested card count based on summary content richness
             word_count = len(detailed_summary.split())
-            # More conservative: 1 card per 200 words, allowing AI to adjust based on content depth
-            suggested_count = min(25, max(5, word_count // 200))
+            # More comprehensive: 1 card per 150 words for better coverage
+            suggested_count = min(30, max(5, word_count // 150))
             
-            logger.info(f"Generating flashcards for video: {video_title} (summary: {word_count} words, suggested: {suggested_count})")
+            logger.info(f"Generating knowledge-testing flashcards for video: {video_title} (summary: {word_count} words, suggested: {suggested_count})")
             
             # Combine summaries for comprehensive context
             combined_content = f"""QUICK OVERVIEW:
-{short_summary}
+{short_summary or "No short summary available"}
 
 DETAILED CONCEPTS:
 {detailed_summary}"""
             
             # Truncate content if it's too long
-            if len(combined_content) > 25000:
-                combined_content = combined_content[:25000] + "...(truncated)"
+            if len(combined_content) > 20000:
+                combined_content = combined_content[:20000] + "...(truncated)"
+                logger.info("Content truncated due to length")
+
+            logger.info(f"Sending content to AI (length: {len(combined_content)} chars)")
 
             response = self.client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="openai/gpt-oss-120b",
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are a strict educational assistant that extracts flashcards directly from text.
+                        "content": """You are an expert educational content creator. Create knowledge-testing flashcards from video content.
 
-                        YOUR TASK: Convert the provided Video Summary into a set of flashcards.
-                        
-                        METHODOLOGY:
-                        1. Read the summary text carefully.
-                        2. Identify every specific concept, definition, term, or key insight mentioned.
-                        3. For each one, create a flashcard where:
-                           - The QUESTION asks about the concept (e.g., "What is [Concept]?", "How does [Process] work?", "What is the significance of [Term]?").
-                           - The ANSWER is the specific definition or fact found in the text.
-                           - The EXPLANATION provides the context, examples, or details found in the text.
+FLASHCARD TYPES:
+1. Definition questions: "What is [concept]?" or "Define [term]"
+2. Process questions: "How does [process] work?" or "Explain the steps of [method]"
+3. Application questions: "When would you use [technique]?" or "What are the benefits of [approach]?"
+4. Comparison questions: "What's the difference between [A] and [B]?"
+5. Technical details: "What are the key components of [system]?"
 
-                        RULES:
-                        - Do NOT invent questions. Only ask about things explicitly defined in the summary.
-                        - Do NOT use outside knowledge. Use ONLY the provided text.
-                        - If the summary has a heading "What is a Neural Network?", create a card: Q: "What is a Neural Network?", A: [The text under that heading].
-                        - Cover the entire summary, from start to finish.
-                        - Generate between 10 and 30 cards depending on the amount of information.
+REQUIREMENTS:
+- Create specific questions based on the video content
+- Focus on important concepts, definitions, and processes
+- Make questions testable and educational
+- Generate 8-20 flashcards depending on content
+- Each flashcard needs: question, answer, explanation
 
-                        OUTPUT FORMAT:
-                        Return a valid JSON object with a single key "flashcards" containing the list of cards.
-                        {{
-                            "flashcards": [
-                                {{
-                                    "question": "What is a Neural Network?",
-                                    "answer": "A complex system that enables computers to learn and make decisions based on data.",
-                                    "explanation": "It is inspired by the human brain and composed of artificial neurons connected by synapses."
-                                }},
-                                ...
-                            ]
-                        }}
-                        """
+OUTPUT FORMAT (JSON only):
+{
+  "flashcards": [
+    {
+      "question": "What is machine learning?",
+      "answer": "A method that enables computers to learn from data without explicit programming.",
+      "explanation": "Machine learning is fundamental to AI and allows systems to improve performance through experience."
+    }
+  ]
+}"""
                     },
                     {
                         "role": "user",
-                        "content": f"""Video Title: {video_title}
+                        "content": f"""Video: {video_title}
 
-SUMMARY TEXT TO PROCESS:
+Content:
 {combined_content}
 
-Extract all key concepts into flashcards based strictly on the text above. Return ONLY the JSON object."""
+Create educational flashcards based on the concepts in this content. Focus on specific, testable knowledge. Return only valid JSON."""
                     }
                 ],
                 temperature=0.3,
-                max_tokens=4000,
+                max_tokens=3000,
                 response_format={"type": "json_object"}
             )
             
             result = response.choices[0].message.content.strip()
+            logger.info(f"AI response received (length: {len(result)})")
+            logger.debug(f"Raw AI response: {result}")
             
             # Parse the JSON response
             import json
             try:
+                # Clean up the response if needed
+                if result.startswith("```json"):
+                    result = result.replace("```json", "").replace("```", "").strip()
+                if result.startswith("```"):
+                    result = result.replace("```", "").strip()
+                
                 data = json.loads(result)
-                # Handle both { "flashcards": [...] } and [...] formats
+                logger.info(f"Successfully parsed JSON. Type: {type(data)}")
+                
+                # Extract flashcards
+                flashcards = []
                 if isinstance(data, dict) and "flashcards" in data:
                     flashcards = data["flashcards"]
                 elif isinstance(data, list):
                     flashcards = data
                 else:
-                    # Try to find a list in the values
-                    found = False
+                    # Try to find any list in the response
                     for key, value in data.items():
-                        if isinstance(value, list):
+                        if isinstance(value, list) and len(value) > 0:
                             flashcards = value
-                            found = True
                             break
-                    if not found:
-                        raise ValueError("Could not find flashcards list in JSON response")
-
-                # Validate the structure
-                valid_flashcards = []
-                for card in flashcards:
-                    if all(key in card for key in ["question", "answer"]):
-                        # Ensure explanation exists
-                        if "explanation" not in card:
-                            card["explanation"] = "See video summary for details."
-                        valid_flashcards.append(card)
                 
-                if len(valid_flashcards) > 0:
+                if not flashcards:
+                    logger.error(f"No flashcards found in response: {data}")
+                    raise ValueError("No flashcards found in AI response")
+
+                # Validate and clean flashcards
+                valid_flashcards = []
+                for i, card in enumerate(flashcards):
+                    try:
+                        if isinstance(card, dict):
+                            question = card.get("question", "").strip()
+                            answer = card.get("answer", "").strip()
+                            explanation = card.get("explanation", "").strip()
+                            
+                            if question and answer:
+                                # Ensure explanation exists
+                                if not explanation:
+                                    explanation = "Review the video content for more details about this concept."
+                                
+                                valid_card = {
+                                    "question": question,
+                                    "answer": answer,
+                                    "explanation": explanation
+                                }
+                                valid_flashcards.append(valid_card)
+                                logger.debug(f"Valid flashcard {i+1}: {question[:50]}...")
+                            else:
+                                logger.warning(f"Flashcard {i+1} missing question or answer: {card}")
+                        else:
+                            logger.warning(f"Flashcard {i+1} is not a dict: {card}")
+                    except Exception as card_error:
+                        logger.warning(f"Error processing flashcard {i+1}: {card_error}")
+                        continue
+                
+                if len(valid_flashcards) >= 1:  # Accept even 1 valid flashcard
                     logger.info(f"Successfully generated {len(valid_flashcards)} flashcards")
                     return valid_flashcards
                 else:
-                    logger.error("No valid flashcards found in response")
-                    return self._generate_fallback_flashcards(video_title)
+                    logger.error(f"No valid flashcards generated from {len(flashcards)} raw cards")
+                    raise ValueError("Failed to generate any valid flashcards")
                     
-            except Exception as e:
-                logger.error(f"Failed to parse flashcards JSON: {e}")
-                logger.error(f"Response was: {result}")
-                return self._generate_fallback_flashcards(video_title)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error: {e}")
+                logger.error(f"Response was: {result[:500]}...")
+                raise ValueError(f"AI returned invalid JSON: {str(e)}")
                 
         except Exception as e:
-            logger.error(f"Error generating flashcards: {e}")
-            return self._generate_fallback_flashcards(video_title)
+            logger.error(f"Error in flashcard generation: {str(e)}")
+            raise ValueError(f"Flashcard generation failed: {str(e)}")
     
-    def _generate_fallback_flashcards(self, video_title: str) -> list:
-        """Generate fallback flashcards when AI generation fails"""
-        return [
-            {
-                "question": f"What is the main topic of '{video_title}'?",
-                "answer": "The video covers fundamental principles and key ideas in this subject area.",
-                "explanation": "This flashcard was automatically generated because the AI could not process the specific details. Please try regenerating the flashcards."
-            },
-            {
-                "question": "What are the core principles explained in this video?",
-                "answer": "Several important principles and theories are presented and explained.",
-                "explanation": "Flashcard generation encountered an issue. Please regenerate for concept-focused study materials."
-            },
-            {
-                "question": "What key terminology is introduced?",
-                "answer": "Key terms and definitions form the foundation of understanding this topic.",
-                "explanation": "Review the video summary to identify critical terminology and concepts."
-            },
-            {
-                "question": "How can the concepts from this video be applied?",
-                "answer": "The concepts have practical applications in various real-world contexts.",
-                "explanation": "Consider real-world scenarios where this knowledge is relevant."
-            },
-            {
-                "question": "What is the conclusion of the video?",
-                "answer": "The video concludes by summarizing the main points and their significance.",
-                "explanation": "Review the end of the video or the summary for the specific conclusion."
-            }
-        ]
 
     async def explain_flashcard_answer(self, question: str, answer: str, context: str, video_title: str) -> str:
         """Generate a detailed explanation for a flashcard answer based on video context"""
@@ -328,42 +332,179 @@ Extract all key concepts into flashcards based strictly on the text above. Retur
             logger.info(f"Generating explanation for flashcard question: {question[:50]}...")
             
             response = self.client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="openai/gpt-oss-120b",
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are an educational AI tutor helping students understand concepts from the video '{video_title}'.
+                        "content": f"""You are an expert educational tutor helping students master concepts from the video '{video_title}'.
                         
-                        A student is reviewing a flashcard and needs a detailed explanation. Provide a comprehensive explanation that:
-                        1. Explains the answer using the SPECIFIC CONTEXT and EXAMPLES from the provided video content
-                        2. Connects the concept to related topics mentioned in the text
-                        3. Helps the student understand WHY this is important
-                        4. Uses clear, educational language suitable for learning
+                        A student is studying with flashcards and needs a comprehensive explanation. Provide an educational explanation that:
                         
-                        CRITICAL: Your explanation must be grounded in the provided video context. Do not hallucinate details not present in the text."""
+                        1. **Clarifies the Answer**: Explain the answer in simple, clear terms
+                        2. **Provides Context**: Use specific examples and details from the video content
+                        3. **Shows Connections**: Link this concept to related topics mentioned in the video
+                        4. **Explains Importance**: Help the student understand WHY this concept matters
+                        5. **Aids Memory**: Include memorable examples, analogies, or mnemonics when appropriate
+                        6. **Encourages Application**: Suggest how this knowledge can be used or applied
+                        
+                        TEACHING APPROACH:
+                        - Use clear, educational language appropriate for learning
+                        - Break down complex concepts into understandable parts
+                        - Provide specific examples from the video content
+                        - Help the student see the bigger picture
+                        - Encourage deeper thinking about the concept
+                        
+                        CRITICAL: Base your explanation entirely on the provided video context. Do not add information not present in the text."""
                     },
                     {
                         "role": "user",
-                        "content": f"""Question: {question}
-Answer: {answer}
+                        "content": f"""Flashcard Question: {question}
+Student's Answer to Review: {answer}
 
-Video Context:
+Video Context and Content:
 {context}
 
-Please explain this answer in detail, using specific information and examples from the video context above."""
+Please provide a comprehensive educational explanation that helps the student understand this concept deeply, using specific information and examples from the video context above."""
                     }
                 ],
                 temperature=0.6,
-                max_tokens=800
+                max_tokens=1000
             )
             
             explanation = response.choices[0].message.content.strip()
-            logger.info("Generated detailed explanation successfully")
+            logger.info("Generated comprehensive educational explanation successfully")
             return explanation
             
         except Exception as e:
             logger.error(f"Error generating flashcard explanation: {e}")
-            return f"The answer is: {answer}\n\nThis concept is discussed in the video '{video_title}'. For more details, please review the video transcript and summary."
+            return f"""**Answer Explanation:**
+{answer}
+
+**Context:** This concept is discussed in the video '{video_title}'. 
+
+**Study Tip:** Review the video transcript and summary for more detailed examples and context about this topic. Understanding the broader context will help you remember and apply this concept more effectively.
+
+**Next Steps:** Try to think of real-world examples where this concept might apply, or how it connects to other topics you've learned."""
+
+    async def generate_notes_from_document(self, content: str, document_title: str, user_prompt: str) -> str:
+        """Generate structured notes from document content based on user prompt"""
+        try:
+            logger.info(f"Generating notes for document: {document_title}")
+            
+            # Truncate content if too long
+            if len(content) > 15000:
+                content = content[:15000] + "...(truncated)"
+            
+            response = self.client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are an expert note-taking assistant for students. Your task is to help students create structured, comprehensive notes from their documents.
+
+GUIDELINES:
+- Create well-organized notes with clear headings and subheadings
+- Use bullet points, numbered lists, and formatting for clarity
+- Focus on key concepts, definitions, and important information
+- Make notes concise but comprehensive
+- Use markdown formatting for structure
+- Include examples when relevant
+- Organize information logically
+
+FORMATTING RULES:
+- Use # for main headings
+- Use ## for subheadings  
+- Use ### for sub-subheadings
+- Use - or * for bullet points
+- Use **bold** for emphasis
+- Use `code` for technical terms
+- Use > for important quotes or definitions
+
+RESPONSE FORMAT:
+Return only the formatted notes content, ready to be inserted into the document."""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""Document Title: {document_title}
+
+User Request: {user_prompt}
+
+Document Content:
+{content}
+
+Please generate structured notes based on the user's request and the document content above."""
+                    }
+                ],
+                temperature=0.3,
+                max_tokens=2000
+            )
+            
+            notes = response.choices[0].message.content.strip()
+            logger.info("Successfully generated notes from document")
+            return notes
+            
+        except Exception as e:
+            logger.error(f"Error generating notes from document: {e}")
+            return f"I apologize, but I encountered an error while generating notes: {str(e)}"
+
+    async def chat_with_document(self, content: str, document_title: str, user_message: str, chat_history: List[Dict] = None) -> str:
+        """Chat with AI about the document content"""
+        try:
+            logger.info(f"Processing chat message for document: {document_title}")
+            
+            # Truncate content if too long
+            if len(content) > 12000:
+                content = content[:12000] + "...(truncated)"
+            
+            # Build conversation history
+            messages = [
+                {
+                    "role": "system",
+                    "content": f"""You are an AI assistant helping a student understand and work with their document titled "{document_title}".
+
+DOCUMENT CONTEXT:
+{content}
+
+CAPABILITIES:
+- Answer questions about the document content
+- Explain concepts mentioned in the document
+- Generate notes, summaries, or bullet points
+- Help with understanding and analysis
+- Suggest improvements or additions
+- Create structured content based on the document
+
+RESPONSE GUIDELINES:
+- Base your responses on the document content provided
+- Be helpful, educational, and encouraging
+- Use clear, student-friendly language
+- When generating content to be inserted, use proper markdown formatting
+- If asked to create notes or summaries, make them well-structured and comprehensive"""
+                }
+            ]
+            
+            # Add chat history if provided
+            if chat_history:
+                for msg in chat_history[-5:]:  # Last 5 messages for context
+                    messages.append({"role": "user", "content": msg.get("message", "")})
+                    messages.append({"role": "assistant", "content": msg.get("response", "")})
+            
+            # Add current user message
+            messages.append({"role": "user", "content": user_message})
+            
+            response = self.client.chat.completions.create(
+                model="llama3-8b-8192",
+                messages=messages,
+                temperature=0.4,
+                max_tokens=1500
+            )
+            
+            ai_response = response.choices[0].message.content.strip()
+            logger.info("Successfully generated chat response for document")
+            return ai_response
+            
+        except Exception as e:
+            logger.error(f"Error in document chat: {e}")
+            return f"I apologize, but I encountered an error: {str(e)}"
 
 ai_service = AIService()
 

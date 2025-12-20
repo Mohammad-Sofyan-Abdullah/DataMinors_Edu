@@ -18,6 +18,8 @@ import FriendRequestsPage from './pages/FriendRequestsPage';
 import MessagesPage from './pages/MessagesPage';
 import YouTubeSummarizerLayout from './pages/YouTubeSummarizerLayout';
 import MarketplacePage from './pages/MarketplacePage';
+import NotesPage from './pages/NotesPage';
+import DocumentEditorPage from './pages/DocumentEditorPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -49,6 +51,8 @@ function App() {
                 }>
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="dashboard" element={<DashboardPage />} />
+                  <Route path="notes" element={<NotesPage />} />
+                  <Route path="notes/:documentId" element={<DocumentEditorPage />} />
                   <Route path="marketplace" element={<MarketplacePage />} />
                   <Route path="classroom/:id" element={<ClassroomPage />} />
                   <Route path="youtube-summarizer" element={<YouTubeSummarizerLayout />} />

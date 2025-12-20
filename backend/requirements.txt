@@ -22,5 +22,6 @@ transformers
 torch
 torchaudio
 librosa
+PyPDF2
 
 

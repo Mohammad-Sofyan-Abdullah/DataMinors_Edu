@@ -100,6 +100,10 @@ app.include_router(youtube.router)
 from app.routers import marketplace
 app.include_router(marketplace.router)
 
+# Import and include Notes router
+from app.routers import notes
+app.include_router(notes.router)
+
 # Mount static files for message uploads
 import os
 if os.path.exists("static"):

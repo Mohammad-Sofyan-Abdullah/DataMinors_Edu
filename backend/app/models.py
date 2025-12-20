@@ -24,7 +24,7 @@ class PyObjectId(str):
         if isinstance(value, str):
             try:
                 if ObjectId.is_valid(value):
-                    return str(ObjectId(value))
+                    return str(value)  # Return the string directly, don't convert to ObjectId
             except Exception:
                 raise ValueError("Invalid ObjectId format")
 
@@ -478,3 +478,49 @@ class UserWallet(BaseModel):
         allow_population_by_field_name = True
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+# Notes Models
+class DocumentStatus(str, Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+
+class Document(BaseModel):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId
+    title: str
+    content: str = ""
+    file_url: Optional[str] = None
+    file_name: Optional[str] = None
+    file_size: Optional[int] = None
+    status: DocumentStatus = DocumentStatus.DRAFT
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+        populate_by_name = True
+
+class DocumentCreate(BaseModel):
+    title: str
+    content: str = ""
+
+class DocumentUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    status: Optional[DocumentStatus] = None
+
+class DocumentChatMessage(BaseModel):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    document_id: PyObjectId
+    user_id: PyObjectId
+    message: str
+    response: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+        populate_by_name = True
