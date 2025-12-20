@@ -4,14 +4,14 @@ import { HelpCircle, ChevronLeft, ChevronRight, RotateCw, Sparkles } from 'lucid
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-const Flashcard = ({ 
-  flashcard, 
-  cardNumber, 
-  totalCards, 
-  onNext, 
-  onPrevious, 
+const Flashcard = ({
+  flashcard,
+  cardNumber,
+  totalCards,
+  onNext,
+  onPrevious,
   onExplain,
-  isExplaining 
+  isExplaining
 }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
@@ -26,9 +26,9 @@ const Flashcard = ({
     if (!isFlipped) {
       setIsFlipped(true);
     }
-    
+
     setShowExplanation(true);
-    
+
     // If we don't have an explanation yet, request one
     if (!explanation && onExplain) {
       const newExplanation = await onExplain(flashcard.question, flashcard.answer);
@@ -68,7 +68,7 @@ const Flashcard = ({
         >
           {/* Front of card - Question */}
           <motion.div
-            className="absolute w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-2xl p-8 flex flex-col items-center justify-center"
+            className="absolute w-full h-full bg-gray-600 rounded-2xl shadow-2xl p-8 flex flex-col items-center justify-center"
             style={{
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
@@ -88,7 +88,7 @@ const Flashcard = ({
 
           {/* Back of card - Answer */}
           <motion.div
-            className="absolute w-full h-full bg-gradient-to-br from-green-500 to-teal-600 rounded-2xl shadow-2xl p-8 flex flex-col items-center justify-center"
+            className="absolute w-full h-full bg-black rounded-2xl shadow-2xl p-8 flex flex-col items-center justify-center"
             style={{
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
@@ -146,11 +146,10 @@ const Flashcard = ({
           whileTap={{ scale: 0.95 }}
           onClick={handlePrevious}
           disabled={cardNumber === 1}
-          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
-            cardNumber === 1
+          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${cardNumber === 1
               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
               : 'bg-white border-2 border-gray-300 text-gray-700 hover:border-blue-500 hover:text-blue-600 shadow-sm'
-          }`}
+            }`}
         >
           <ChevronLeft size={20} />
           Previous
@@ -174,11 +173,10 @@ const Flashcard = ({
           whileTap={{ scale: 0.95 }}
           onClick={handleNext}
           disabled={cardNumber === totalCards}
-          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
-            cardNumber === totalCards
+          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${cardNumber === totalCards
               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
               : 'bg-white border-2 border-gray-300 text-gray-700 hover:border-blue-500 hover:text-blue-600 shadow-sm'
-          }`}
+            }`}
         >
           Next
           <ChevronRight size={20} />
@@ -191,11 +189,10 @@ const Flashcard = ({
           {Array.from({ length: totalCards }).map((_, index) => (
             <div
               key={index}
-              className={`h-1.5 rounded-full transition-all ${
-                index + 1 === cardNumber
+              className={`h-1.5 rounded-full transition-all ${index + 1 === cardNumber
                   ? 'w-8 bg-blue-500'
                   : 'w-1.5 bg-gray-300'
-              }`}
+                }`}
             />
           ))}
         </div>
