@@ -567,3 +567,82 @@ async def explain_flashcard(
             detail=f"Failed to generate explanation: {str(e)}"
         )
 
+@router.post("/sessions/{session_id}/related-videos")
+async def generate_related_videos(
+    session_id: str,
+    count: int = Body(8, embed=True),
+    current_user: UserInDB = Depends(get_current_active_user),
+    db = Depends(get_database)
+):
+    """Generate related YouTube video suggestions for further study"""
+    try:
+        session_object_id = ObjectId(session_id)
+    except:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid session ID"
+        )
+    
+    # Get session
+    session = await db.youtube_sessions.find_one({
+        "_id": session_object_id,
+        "user_id": current_user.id
+    })
+    
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+    
+    if not session.get("short_summary") or not session.get("detailed_summary"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No summaries available for this session. Please regenerate summaries first."
+        )
+    
+    try:
+        # Generate related videos using AI service
+        requested_count = min(count, 10) if count else 8
+        related_videos_data = await ai_service.generate_related_videos(
+            short_summary=session["short_summary"],
+            detailed_summary=session["detailed_summary"],
+            video_title=session["video_title"],
+            count=requested_count
+        )
+        
+        # Update session with related videos
+        await db.youtube_sessions.update_one(
+            {"_id": session_object_id},
+            {
+                "$set": {
+                    "related_videos": related_videos_data,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        logger.info(f"Generated {len(related_videos_data)} related videos for session {session_id}")
+        
+        return {
+            "related_videos": related_videos_data,
+            "count": len(related_videos_data)
+        }
+        
+    except ValueError as e:
+        # Handle specific related videos generation errors
+        logger.error(f"Related videos generation failed: {e}")
+        return {
+            "related_videos": [],
+            "count": 0,
+            "message": "Related videos not available right now. Please try again later.",
+            "error": str(e)
+        }
+        
+    except Exception as e:
+        logger.error(f"Unexpected error generating related videos: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while generating related videos"
+        )
+

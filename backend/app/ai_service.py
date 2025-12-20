@@ -540,5 +540,181 @@ RESPONSE GUIDELINES:
             logger.error(f"Error in document chat: {e}")
             return f"I apologize, but I encountered an error: {str(e)}"
 
+    async def generate_related_videos(self, short_summary: str, detailed_summary: str, video_title: str, count: int = 8) -> list:
+        """Generate related YouTube video suggestions based on video content"""
+        try:
+            logger.info(f"Generating related videos for: {video_title}")
+            
+            # Validate input summaries
+            if not detailed_summary or len(detailed_summary.strip()) < 20:
+                logger.warning(f"Detailed summary too short ({len(detailed_summary) if detailed_summary else 0} chars)")
+                raise ValueError("Video summary is too short to generate meaningful related videos")
+            
+            # Calculate suggested count based on content richness
+            word_count = len(detailed_summary.split())
+            suggested_count = min(10, max(5, word_count // 200))
+            
+            logger.info(f"Generating {suggested_count} related video suggestions for: {video_title}")
+            
+            # Combine summaries for comprehensive context
+            combined_content = f"""VIDEO TITLE: {video_title}
+
+QUICK OVERVIEW:
+{short_summary or "No short summary available"}
+
+DETAILED CONTENT:
+{detailed_summary}"""
+            
+            # Truncate content if too long
+            if len(combined_content) > 15000:
+                combined_content = combined_content[:15000] + "...(truncated)"
+                logger.info("Content truncated due to length")
+
+            logger.info(f"Sending content to AI (length: {len(combined_content)} chars)")
+
+            response = self.client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are an expert educational content curator. Generate related YouTube video suggestions based on the provided video content.
+
+REQUIREMENTS:
+- Create realistic YouTube video titles that would help students learn more about the topics
+- Focus on educational content that complements the original video
+- Include variety: tutorials, explanations, examples, advanced topics, and foundational concepts
+- Make titles engaging and educational
+- Suggest videos that would logically follow or supplement the learning journey
+- Include both beginner-friendly and more advanced content
+- Focus on practical applications and real-world examples
+
+SUGGESTION TYPES:
+1. Foundational concepts (if the video covers advanced topics)
+2. Advanced applications (if the video covers basics)
+3. Practical tutorials and examples
+4. Related topics and concepts
+5. Different perspectives on the same topic
+6. Real-world applications
+7. Case studies and examples
+8. Complementary skills and knowledge
+
+OUTPUT FORMAT (JSON only):
+{
+  "related_videos": [
+    {
+      "title": "Complete Beginner's Guide to Machine Learning in 2024",
+      "description": "Perfect for understanding the fundamentals before diving deeper into advanced ML concepts",
+      "category": "Foundational",
+      "difficulty": "Beginner",
+      "estimated_duration": "15-20 minutes",
+      "why_relevant": "Provides essential background knowledge for better understanding of the original video's advanced concepts"
+    }
+  ]
+}"""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""Based on this video content, suggest {suggested_count} related YouTube videos that would help students learn more about these topics:
+
+{combined_content}
+
+Generate educational video suggestions that would complement this content and help students in their exam preparation. Return only valid JSON."""
+                    }
+                ],
+                temperature=0.4,
+                max_tokens=2500,
+                response_format={"type": "json_object"}
+            )
+            
+            result = response.choices[0].message.content.strip()
+            logger.info(f"AI response received (length: {len(result)})")
+            logger.debug(f"Raw AI response: {result}")
+            
+            # Parse the JSON response
+            import json
+            try:
+                # Clean up the response if needed
+                if result.startswith("```json"):
+                    result = result.replace("```json", "").replace("```", "").strip()
+                if result.startswith("```"):
+                    result = result.replace("```", "").strip()
+                
+                data = json.loads(result)
+                logger.info(f"Successfully parsed JSON. Type: {type(data)}")
+                
+                # Extract related videos
+                related_videos = []
+                if isinstance(data, dict) and "related_videos" in data:
+                    related_videos = data["related_videos"]
+                elif isinstance(data, list):
+                    related_videos = data
+                else:
+                    # Try to find any list in the response
+                    for key, value in data.items():
+                        if isinstance(value, list) and len(value) > 0:
+                            related_videos = value
+                            break
+                
+                if not related_videos:
+                    logger.error(f"No related videos found in response: {data}")
+                    raise ValueError("No related videos found in AI response")
+
+                # Validate and clean related videos
+                valid_videos = []
+                for i, video in enumerate(related_videos):
+                    try:
+                        if isinstance(video, dict):
+                            title = video.get("title", "").strip()
+                            description = video.get("description", "").strip()
+                            category = video.get("category", "Educational").strip()
+                            difficulty = video.get("difficulty", "Intermediate").strip()
+                            duration = video.get("estimated_duration", "10-15 minutes").strip()
+                            relevance = video.get("why_relevant", "Complements the original video content").strip()
+                            
+                            if title and description:
+                                # Ensure all fields exist
+                                if not category:
+                                    category = "Educational"
+                                if not difficulty:
+                                    difficulty = "Intermediate"
+                                if not duration:
+                                    duration = "10-15 minutes"
+                                if not relevance:
+                                    relevance = "Provides additional insights on the topic"
+                                
+                                valid_video = {
+                                    "title": title,
+                                    "description": description,
+                                    "category": category,
+                                    "difficulty": difficulty,
+                                    "estimated_duration": duration,
+                                    "why_relevant": relevance
+                                }
+                                valid_videos.append(valid_video)
+                                logger.debug(f"Valid related video {i+1}: {title[:50]}...")
+                            else:
+                                logger.warning(f"Related video {i+1} missing title or description: {video}")
+                        else:
+                            logger.warning(f"Related video {i+1} is not a dict: {video}")
+                    except Exception as video_error:
+                        logger.warning(f"Error processing related video {i+1}: {video_error}")
+                        continue
+                
+                if len(valid_videos) >= 1:  # Accept even 1 valid video
+                    logger.info(f"Successfully generated {len(valid_videos)} related video suggestions")
+                    return valid_videos
+                else:
+                    logger.error(f"No valid related videos generated from {len(related_videos)} raw suggestions")
+                    raise ValueError("Failed to generate any valid related video suggestions")
+                    
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error: {e}")
+                logger.error(f"Response was: {result[:500]}...")
+                raise ValueError(f"AI returned invalid JSON: {str(e)}")
+                
+        except Exception as e:
+            logger.error(f"Error in related videos generation: {str(e)}")
+            raise ValueError(f"Related videos generation failed: {str(e)}")
+
 ai_service = AIService()
 
