@@ -68,7 +68,6 @@ const Layout = () => {
     { name: 'Messages', href: '/messages', icon: MessageSquare },
     { name: 'YouTube Summarizer', href: '/youtube-summarizer', icon: Youtube },
     { name: 'Friends', href: '/friends', icon: Users },
-    { name: 'Friend Requests', href: '/friend-requests', icon: UserCheck },
     { name: 'Profile', href: '/profile', icon: User },
   ];
 
