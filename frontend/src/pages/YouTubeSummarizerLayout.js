@@ -1,12 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 // import { Menu, X } from 'lucide-react';
 import YouTubeSidebar from '../components/YouTubeSidebar';
 import YouTubeSummarizerPage from './YouTubeSummarizerPage';
 
 const YouTubeSummarizerLayout = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Handle session ID from URL parameter (for deep linking from shared content)
+  useEffect(() => {
+    const sessionFromUrl = searchParams.get('session');
+    if (sessionFromUrl && sessionFromUrl !== selectedSessionId) {
+      setSelectedSessionId(sessionFromUrl);
+      // Clean up the URL parameter after using it
+      searchParams.delete('session');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, selectedSessionId, setSearchParams]);
 
   const handleSessionSelect = (sessionId) => {
     setSelectedSessionId(sessionId);

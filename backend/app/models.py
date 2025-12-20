@@ -329,6 +329,30 @@ class MessageType(str, Enum):
     AUDIO = "audio"
     FILE = "file"
     AI_RESPONSE = "ai_response"
+    SHARED_CONTENT = "shared_content"
+
+# Shareable content types
+class SharedContentType(str, Enum):
+    YOUTUBE_SUMMARY = "youtube_summary"
+    YOUTUBE_VIDEO = "youtube_video"
+    YOUTUBE_SESSION = "youtube_session"  # Full session that can be imported
+    FLASHCARDS = "flashcards"
+    SLIDES = "slides"
+    AI_CHAT = "ai_chat"
+    NOTES = "notes"
+
+class SharedContentData(BaseModel):
+    content_type: SharedContentType
+    title: str
+    description: Optional[str] = None
+    preview_text: Optional[str] = None
+    preview_image_url: Optional[str] = None
+    source_url: Optional[str] = None
+    source_id: Optional[str] = None  # ID of the original resource (session_id, document_id, etc.)
+    metadata: Optional[Dict[str, Any]] = None  # Additional data (flashcards array, slides array, etc.)
+
+    class Config:
+        use_enum_values = True
 
 class DirectMessage(BaseModel):
     id: Optional[str] = Field(None, alias="_id")
@@ -346,6 +370,7 @@ class DirectMessage(BaseModel):
     is_read: bool = False
     is_edited: bool = False
     edited_at: Optional[datetime] = None
+    shared_content: Optional[SharedContentData] = None  # For shared content messages
 
     class Config:
         populate_by_name = True

@@ -4,11 +4,12 @@ from bson import ObjectId
 from datetime import datetime
 import os
 import shutil
+import json
 from pathlib import Path
 
 from app.auth import get_current_active_user
 from app.database import get_database
-from app.models import UserInDB, DirectMessage, Conversation, MessageType
+from app.models import UserInDB, DirectMessage, Conversation, MessageType, SharedContentData
 from app.ai_service import ai_service
 import logging
 
@@ -187,6 +188,7 @@ async def get_messages(
                 "file_name": msg.get("file_name"),
                 "file_size": msg.get("file_size"),
                 "is_ai_response": msg.get("is_ai_response", False),
+                "shared_content": msg.get("shared_content"),
                 "timestamp": msg["timestamp"],
                 "is_read": msg["is_read"],
                 "sender": {
@@ -216,6 +218,7 @@ async def send_message(
     content: Optional[str] = Form(None),
     message_type: MessageType = Form(MessageType.TEXT),
     file: Optional[UploadFile] = File(None),
+    shared_content: Optional[str] = Form(None),  # JSON string of SharedContentData
     current_user: UserInDB = Depends(get_current_active_user),
     db = Depends(get_database)
 ):
@@ -275,11 +278,32 @@ async def send_message(
                 else:
                     message_type = MessageType.FILE
 
-        # Validate: either content or file must be present
-        if not content and not file:
+        # Parse and validate shared content if present
+        shared_content_data = None
+        if shared_content:
+            try:
+                shared_content_dict = json.loads(shared_content)
+                shared_content_data = SharedContentData(**shared_content_dict)
+                message_type = MessageType.SHARED_CONTENT
+                logger.info(f"Parsed shared content: {shared_content_data}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid shared content JSON: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid shared content format"
+                )
+            except Exception as e:
+                logger.error(f"Error parsing shared content: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid shared content data: {str(e)}"
+                )
+
+        # Validate: either content, file, or shared_content must be present
+        if not content and not file and not shared_content_data:
              raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Message must have content or a file"
+                detail="Message must have content, a file, or shared content"
             )
 
         # Create message
@@ -295,6 +319,7 @@ async def send_message(
             file_url=file_url,
             file_name=file_name,
             file_size=file_size,
+            shared_content=shared_content_data,
             timestamp=datetime.utcnow()
         )
         

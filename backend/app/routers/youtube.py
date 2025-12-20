@@ -754,3 +754,84 @@ async def generate_related_videos(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while generating related videos"
         )
+
+@router.post("/sessions/{session_id}/import")
+async def import_shared_session(
+    session_id: str,
+    current_user: UserInDB = Depends(get_current_active_user),
+    db = Depends(get_database)
+):
+    """Import a shared YouTube session to the current user's account"""
+    try:
+        session_object_id = ObjectId(session_id)
+    except:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid session ID"
+        )
+    
+    # Find the original session (any user's session)
+    original_session = await db.youtube_sessions.find_one({
+        "_id": session_object_id
+    })
+    
+    if not original_session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+    
+    # Check if user already owns this session
+    if str(original_session.get("user_id")) == str(current_user.id):
+        return {
+            "message": "You already own this session",
+            "session_id": session_id,
+            "already_owned": True
+        }
+    
+    # Check if user already imported this session (prevent duplicates)
+    existing_import = await db.youtube_sessions.find_one({
+        "user_id": current_user.id,
+        "imported_from": session_id
+    })
+    
+    if existing_import:
+        return {
+            "message": "Session already imported",
+            "session_id": str(existing_import["_id"]),
+            "already_imported": True
+        }
+    
+    # Clone the session for the current user
+    cloned_session = {
+        "user_id": current_user.id,
+        "video_url": original_session["video_url"],
+        "video_title": original_session["video_title"],
+        "video_duration": original_session.get("video_duration"),
+        "transcript": original_session.get("transcript"),
+        "short_summary": original_session.get("short_summary"),
+        "detailed_summary": original_session.get("detailed_summary"),
+        "chat_history": original_session.get("chat_history", []),  # Include chat history
+        "flashcards": original_session.get("flashcards", []),
+        "slides_pdf_url": original_session.get("slides_pdf_url"),
+        "slides_status": original_session.get("slides_status"),
+        "generated_slide_images": original_session.get("generated_slide_images", []),
+        "related_videos": original_session.get("related_videos", []),
+        "imported_from": session_id,  # Track original session
+        "shared_by": str(original_session.get("user_id")),  # Track who shared it
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
+    
+    # Insert cloned session
+    result = await db.youtube_sessions.insert_one(cloned_session)
+    new_session_id = str(result.inserted_id)
+    
+    logger.info(f"User {current_user.id} imported session {session_id} as {new_session_id}")
+    
+    return {
+        "message": "Session imported successfully",
+        "session_id": new_session_id,
+        "video_title": original_session["video_title"],
+        "imported": True
+    }

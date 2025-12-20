@@ -231,7 +231,8 @@ export const youtubeAPI = {
   generateFlashcards: (sessionId, count = 10) => api.post(`/youtube/sessions/${sessionId}/flashcards`, { count }),
   explainFlashcard: (sessionId, question, answer) => api.post(`/youtube/sessions/${sessionId}/flashcards/explain`, { question, answer }),
   generateSlides: (sessionId, count = 5) => api.post(`/youtube/sessions/${sessionId}/slides`, { count }),
-  generateRelatedVideos: (sessionId, count = 8) => api.post(`/youtube/sessions/${sessionId}/related-videos`, { count })
+  generateRelatedVideos: (sessionId, count = 8) => api.post(`/youtube/sessions/${sessionId}/related-videos`, { count }),
+  importSession: (sessionId) => api.post(`/youtube/sessions/${sessionId}/import`),
 };
 
 // Messages API
@@ -244,6 +245,29 @@ export const messagesAPI = {
     api.post(`/messages/conversations/${conversationId}/messages`, formData),
   deleteMessage: (messageId) => api.delete(`/messages/messages/${messageId}`),
   getUserInfo: (userId) => api.get(`/auth/user/${userId}`),
+  // Share content to a friend
+  shareContent: async (friendId, sharedContent) => {
+    // First, create or get the conversation with the friend
+    const convResponse = await api.post(`/messages/conversations/${friendId}`);
+    const conversationId = convResponse.data.conversation_id;
+
+    // Then send the shared content message
+    const formData = new FormData();
+    formData.append('content', sharedContent.message || '');
+    formData.append('message_type', 'shared_content');
+    formData.append('shared_content', JSON.stringify({
+      content_type: sharedContent.content_type,
+      title: sharedContent.title,
+      description: sharedContent.description,
+      preview_text: sharedContent.preview_text,
+      preview_image_url: sharedContent.preview_image_url,
+      source_url: sharedContent.source_url,
+      source_id: sharedContent.source_id,
+      metadata: sharedContent.metadata
+    }));
+
+    return api.post(`/messages/conversations/${conversationId}/messages`, formData);
+  },
 };
 
 // Marketplace API
