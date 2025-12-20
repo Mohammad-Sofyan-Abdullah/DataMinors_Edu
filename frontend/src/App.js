@@ -16,7 +16,7 @@ import DashboardPage from './pages/DashboardPage';
 import ClassroomPage from './pages/ClassroomPage';
 import ProfilePage from './pages/ProfilePage';
 import FriendsPage from './pages/FriendsPage';
-import FriendRequestsPage from './pages/FriendRequestsPage';
+
 import MessagesPage from './pages/MessagesPage';
 import ConversationsListPage from './pages/ConversationsListPage';
 import YouTubeSummarizerLayout from './pages/YouTubeSummarizerLayout';
@@ -103,8 +103,7 @@ function App() {
                   <Route path="classroom/:id" element={<ClassroomPage />} />
                   <Route path="youtube-summarizer" element={<YouTubeSummarizerLayout />} />
                   <Route path="profile" element={<ProfilePage />} />
-                  <Route path="friends" element={<FriendsPage />} />
-                  <Route path="friend-requests" element={<FriendRequestsPage />} />
+                  <Route path="/friends" element={<FriendsPage />} />
                   <Route path="messages" element={<ConversationsListPage />} />
                   <Route path="messages/:friendId" element={<MessagesPage />} />
 

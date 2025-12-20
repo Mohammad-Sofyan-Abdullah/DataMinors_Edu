@@ -9,6 +9,7 @@ import {
     Layers,
     HelpCircle,
     ArrowLeft,
+    ArrowRight,
     Send,
     RefreshCw,
     Download,
@@ -536,108 +537,160 @@ const DocumentSessionPage = () => {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
-                                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-full overflow-y-auto"
+                                className="h-full flex flex-col bg-gray-50 rounded-xl overflow-hidden border border-gray-200"
                             >
-                                <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-yellow-50 to-orange-50">
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900 flex items-center space-x-2">
-                                            <GraduationCap className="h-5 w-5 text-orange-600" />
-                                            <span>Flashcards</span>
-                                        </h3>
-                                        <p className="text-sm text-gray-600">Study key concepts from the document</p>
+                                {/* Header / Controls */}
+                                <div className="px-6 py-4 bg-white border-b border-gray-200 flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="p-2 bg-indigo-100 rounded-lg">
+                                            <GraduationCap className="h-5 w-5 text-indigo-600" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-semibold text-gray-900">Flashcards</h3>
+                                            <p className="text-sm text-gray-500">
+                                                {session.flashcards?.length || 0} cards available
+                                            </p>
+                                        </div>
                                     </div>
                                     <button
                                         onClick={() => flashcardsMutation.mutate()}
                                         disabled={flashcardsMutation.isLoading}
-                                        className="btn-outline flex items-center space-x-2"
+                                        className="btn-outline flex items-center space-x-2 text-sm"
                                     >
                                         {flashcardsMutation.isLoading ? (
                                             <Loader2 className="h-4 w-4 animate-spin" />
                                         ) : (
                                             <RefreshCw className="h-4 w-4" />
                                         )}
-                                        <span>{session?.flashcards?.length ? 'Regenerate' : 'Generate'}</span>
+                                        <span>Regenerate</span>
                                     </button>
                                 </div>
 
-                                {(!session?.flashcards || session.flashcards.length === 0) ? (
-                                    <div className="p-12 text-center">
-                                        <Layers className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                                        <h3 className="text-lg font-semibold text-gray-700 mb-2">No Flashcards Yet</h3>
-                                        <p className="text-gray-500 mb-4">
-                                            {session.detailed_summary
-                                                ? 'Generate flashcards to help you study'
-                                                : 'Generate a summary first, then create flashcards'}
-                                        </p>
-                                        {session.detailed_summary && (
+                                {/* Main Content */}
+                                <div className="flex-1 overflow-y-auto p-6 md:p-12 flex flex-col items-center justify-center bg-gray-50/50">
+                                    {(!session?.flashcards || session.flashcards.length === 0) ? (
+                                        <div className="text-center max-w-md mx-auto">
+                                            <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mx-auto mb-6">
+                                                <Layers className="h-8 w-8 text-indigo-500" />
+                                            </div>
+                                            <h3 className="text-xl font-bold text-gray-900 mb-3">No flashcards yet</h3>
+                                            <p className="text-gray-500 mb-8 leading-relaxed">
+                                                Generate flashcards from your document to start testing your knowledge and memorizing key concepts.
+                                            </p>
                                             <button
                                                 onClick={() => flashcardsMutation.mutate()}
                                                 disabled={flashcardsMutation.isLoading}
-                                                className="btn-primary flex items-center space-x-2 mx-auto"
+                                                className="btn-primary w-full justify-center py-3 text-base shadow-lg shadow-primary-500/20"
                                             >
-                                                <Sparkles className="h-4 w-4" />
-                                                <span>Generate Flashcards</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="p-6">
-                                        {/* Flashcard */}
-                                        <div
-                                            className="relative h-64 cursor-pointer perspective-1000"
-                                            onClick={() => setIsFlashcardFlipped(!isFlashcardFlipped)}
-                                        >
-                                            <motion.div
-                                                className="absolute inset-0 rounded-xl shadow-lg p-6 flex flex-col items-center justify-center text-center"
-                                                animate={{ rotateY: isFlashcardFlipped ? 180 : 0 }}
-                                                transition={{ duration: 0.6 }}
-                                                style={{
-                                                    backfaceVisibility: 'hidden',
-                                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                                                }}
-                                            >
-                                                <p className="text-lg font-medium text-white">
-                                                    {session.flashcards[currentFlashcardIndex]?.question}
-                                                </p>
-                                                <p className="text-white/70 text-sm mt-4">Click to reveal answer</p>
-                                            </motion.div>
-                                            <motion.div
-                                                className="absolute inset-0 rounded-xl shadow-lg p-6 flex flex-col items-center justify-center text-center bg-white border-2 border-purple-200"
-                                                animate={{ rotateY: isFlashcardFlipped ? 0 : -180 }}
-                                                transition={{ duration: 0.6 }}
-                                                style={{ backfaceVisibility: 'hidden' }}
-                                            >
-                                                <p className="text-lg font-medium text-gray-900">
-                                                    {session.flashcards[currentFlashcardIndex]?.answer}
-                                                </p>
-                                                {session.flashcards[currentFlashcardIndex]?.explanation && (
-                                                    <p className="text-sm text-gray-500 mt-4">
-                                                        {session.flashcards[currentFlashcardIndex]?.explanation}
-                                                    </p>
+                                                {flashcardsMutation.isLoading ? (
+                                                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                                                ) : (
+                                                    <Sparkles className="h-5 w-5 mr-2" />
                                                 )}
-                                            </motion.div>
+                                                Generate Flashcards
+                                            </button>
                                         </div>
+                                    ) : (
+                                        <div className="w-full max-w-3xl flex flex-col gap-8">
+                                            {/* Progress Bar */}
+                                            <div className="w-full flex items-center gap-4">
+                                                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                                    <motion.div
+                                                        className="bg-indigo-600 h-2 rounded-full"
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${((currentFlashcardIndex + 1) / session.flashcards.length) * 100}%` }}
+                                                        transition={{ duration: 0.3 }}
+                                                    />
+                                                </div>
+                                                <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">
+                                                    {Math.round(((currentFlashcardIndex + 1) / session.flashcards.length) * 100)}% Complete
+                                                </span>
+                                            </div>
 
-                                        {/* Navigation */}
-                                        <div className="flex items-center justify-between mt-6">
-                                            <button
-                                                onClick={() => handleFlashcardNavigation('prev')}
-                                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                            {/* Card Container */}
+                                            <div
+                                                className="relative w-full aspect-[16/9] cursor-pointer perspective-1000 group"
+                                                onClick={() => setIsFlashcardFlipped(!isFlashcardFlipped)}
                                             >
-                                                <ChevronLeft className="h-6 w-6 text-gray-600" />
-                                            </button>
-                                            <span className="text-gray-600 font-medium">
-                                                {currentFlashcardIndex + 1} / {session.flashcards.length}
-                                            </span>
-                                            <button
-                                                onClick={() => handleFlashcardNavigation('next')}
-                                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                            >
-                                                <ChevronRight className="h-6 w-6 text-gray-600" />
-                                            </button>
+                                                {/* Card Front */}
+                                                <motion.div
+                                                    className="absolute inset-0 w-full h-full bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 p-8 md:p-16 flex flex-col items-center justify-center text-center backface-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-shadow duration-300"
+                                                    animate={{ rotateY: isFlashcardFlipped ? 180 : 0 }}
+                                                    transition={{ duration: 0.6, type: "spring", stiffness: 260, damping: 20 }}
+                                                    style={{ backfaceVisibility: 'hidden' }}
+                                                >
+                                                    <span className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-6 px-3 py-1 bg-indigo-50 rounded-full">Question</span>
+                                                    <p className="text-2xl md:text-3xl font-medium text-gray-800 leading-relaxed font-serif">
+                                                        {session.flashcards[currentFlashcardIndex]?.question}
+                                                    </p>
+                                                    <p className="text-gray-400 text-sm mt-auto pt-8 group-hover:text-indigo-500 transition-colors flex items-center gap-2">
+                                                        <span>Click to flip</span>
+                                                        <ArrowRight className="h-3 w-3" />
+                                                    </p>
+                                                </motion.div>
+
+                                                {/* Card Back */}
+                                                <motion.div
+                                                    className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl shadow-[0_8px_30px_rgb(79,70,229,0.3)] p-8 md:p-16 flex flex-col items-center justify-center text-center text-white backface-hidden"
+                                                    initial={{ rotateY: 180 }}
+                                                    animate={{ rotateY: isFlashcardFlipped ? 0 : 180 }}
+                                                    transition={{ duration: 0.6, type: "spring", stiffness: 260, damping: 20 }}
+                                                    style={{ backfaceVisibility: 'hidden' }}
+                                                >
+                                                    <span className="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-6 px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm">Answer</span>
+                                                    <p className="text-xl md:text-2xl font-medium leading-relaxed">
+                                                        {session.flashcards[currentFlashcardIndex]?.answer}
+                                                    </p>
+                                                    {session.flashcards[currentFlashcardIndex]?.explanation && (
+                                                        <div className="mt-8 pt-6 border-t border-white/10 w-full">
+                                                            <p className="text-indigo-100 text-sm leading-relaxed">
+                                                                <span className="font-semibold text-white mr-2">Explanation:</span>
+                                                                {session.flashcards[currentFlashcardIndex]?.explanation}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </motion.div>
+                                            </div>
+
+                                            {/* Controls */}
+                                            <div className="flex items-center justify-between px-4 mt-auto">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleFlashcardNavigation('prev');
+                                                    }}
+                                                    className={`p-4 rounded-full transition-all duration-200 flex items-center gap-2 ${currentFlashcardIndex === 0
+                                                        ? 'text-gray-300 cursor-not-allowed'
+                                                        : 'text-gray-700 hover:bg-white hover:shadow-md hover:text-indigo-600 bg-white/50 border border-transparent hover:border-gray-100'
+                                                        }`}
+                                                    disabled={currentFlashcardIndex === 0}
+                                                >
+                                                    <ChevronLeft className="h-6 w-6" />
+                                                    <span className="text-sm font-medium hidden md:block">Previous</span>
+                                                </button>
+
+                                                <div className="text-gray-900 font-bold font-mono text-lg tracking-wider bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-100">
+                                                    {currentFlashcardIndex + 1} <span className="text-gray-300 font-light">/</span> {session.flashcards.length}
+                                                </div>
+
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleFlashcardNavigation('next');
+                                                    }}
+                                                    className={`p-4 rounded-full transition-all duration-200 flex items-center gap-2 ${currentFlashcardIndex === session.flashcards.length - 1
+                                                        ? 'text-gray-300 cursor-not-allowed'
+                                                        : 'text-gray-700 hover:bg-white hover:shadow-md hover:text-indigo-600 bg-white/50 border border-transparent hover:border-gray-100'
+                                                        }`}
+                                                    disabled={currentFlashcardIndex === session.flashcards.length - 1}
+                                                >
+                                                    <span className="text-sm font-medium hidden md:block">Next</span>
+                                                    <ChevronRight className="h-6 w-6" />
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </motion.div>
                         )}
 
