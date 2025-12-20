@@ -9,6 +9,7 @@ from app.auth import get_current_active_user, generate_invite_code
 from app.database import get_database
 from app.ai_service import ai_service
 from app.models import UserInDB
+from app.socketio_server import sio
 from bson import ObjectId
 import logging
 
@@ -281,7 +282,118 @@ async def add_member_to_classroom(
         {"$addToSet": {"members": user_object_id}}
     )
     
+    # Emit socket event to notify the added user to refresh their classroom list
+    await sio.emit('classroom_added', {
+        'classroom_id': str(classroom_object_id),
+        'classroom_name': classroom['name']
+    }, room=str(user_object_id))
+    
     return {"message": f"Successfully added {user.get('username', 'user')} to classroom"}
+
+@router.delete("/{classroom_id}/members/{user_id}")
+async def remove_member_from_classroom(
+    classroom_id: str,
+    user_id: str,
+    current_user: UserInDB = Depends(get_current_active_user),
+    db = Depends(get_database)
+):
+    """Remove a member from classroom (admin only)"""
+    try:
+        classroom_object_id = ObjectId(classroom_id)
+        user_object_id = ObjectId(user_id)
+    except:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid classroom or user ID"
+        )
+    
+    # Get classroom
+    classroom = await db.classrooms.find_one({"_id": classroom_object_id})
+    if not classroom:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Classroom not found"
+        )
+    
+    # Check if current user is admin
+    if str(classroom["admin_id"]) != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin can remove members"
+        )
+    
+    # Cannot remove admin
+    if str(classroom["admin_id"]) == str(user_object_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot remove classroom admin"
+        )
+    
+    # Check if user is a member
+    if user_object_id not in classroom["members"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is not a member of this classroom"
+        )
+    
+    # Remove user from classroom
+    await db.classrooms.update_one(
+        {"_id": classroom_object_id},
+        {"$pull": {"members": user_object_id}}
+    )
+    
+    # Emit socket event to notify the removed user
+    await sio.emit('classroom_removed', {
+        'classroom_id': str(classroom_object_id),
+        'classroom_name': classroom['name']
+    }, room=str(user_object_id))
+    
+    return {"message": "Member removed successfully"}
+
+@router.get("/{classroom_id}/members")
+async def get_classroom_members(
+    classroom_id: str,
+    current_user: UserInDB = Depends(get_current_active_user),
+    db = Depends(get_database)
+):
+    """Get all members of a classroom"""
+    try:
+        classroom_object_id = ObjectId(classroom_id)
+    except:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid classroom ID"
+        )
+    
+    classroom = await db.classrooms.find_one({"_id": classroom_object_id})
+    if not classroom:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Classroom not found"
+        )
+    
+    # Check if user is a member
+    if current_user.id not in classroom["members"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not a member of this classroom"
+        )
+    
+    # Get member details
+    members = []
+    for member_id in classroom["members"]:
+        user = await db.users.find_one({"_id": member_id})
+        if user:
+            members.append({
+                "id": str(user["_id"]),
+                "username": user.get("username", ""),
+                "name": user.get("name", ""),
+                "email": user.get("email", ""),
+                "avatar": user.get("avatar", ""),
+                "is_admin": str(user["_id"]) == str(classroom["admin_id"])
+            })
+    
+    return members
 
 @router.get("/{classroom_id}/available-friends")
 async def get_available_friends_for_classroom(

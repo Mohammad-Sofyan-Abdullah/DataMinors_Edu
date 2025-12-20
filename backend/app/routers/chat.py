@@ -213,12 +213,15 @@ async def send_message(
     message_obj = Message(**created_message)
     
     # Broadcast to Socket.IO room
+    message_dict = message_obj.dict()
+    message_dict['id'] = str(message_obj.id)
+    message_dict['_id'] = str(message_obj.id)
+    message_dict['room_id'] = str(message_obj.room_id)
+    message_dict['sender_id'] = str(message_obj.sender_id)
+    message_dict['timestamp'] = message_obj.timestamp.isoformat() if message_obj.timestamp else None
+    
     await sio.emit('new_message', {
-        'message': {
-            **message_obj.dict(),
-            '_id': str(message_obj.id),
-            'room_id': str(message_obj.room_id)
-        },
+        'message': message_dict,
         'sender_name': current_user.name,
         'sender_avatar': current_user.avatar
     }, room=str(room_id))
@@ -289,12 +292,17 @@ async def edit_message(
     message_obj = Message(**updated_message)
     
     # Broadcast edit to Socket.IO room
+    message_dict = message_obj.dict()
+    message_dict['id'] = str(message_obj.id)
+    message_dict['_id'] = str(message_obj.id)
+    message_dict['room_id'] = str(message['room_id'])
+    message_dict['sender_id'] = str(message_obj.sender_id)
+    message_dict['timestamp'] = message_obj.timestamp.isoformat() if message_obj.timestamp else None
+    if hasattr(message_obj, 'edited_at') and message_obj.edited_at:
+        message_dict['edited_at'] = message_obj.edited_at.isoformat()
+    
     await sio.emit('message_edited', {
-        'message': {
-            **message_obj.dict(),
-            '_id': str(message_obj.id),
-            'room_id': str(message['room_id'])
-        },
+        'message': message_dict,
         'sender_name': current_user.name
     }, room=str(message["room_id"]))
     

@@ -45,6 +45,12 @@ async def connect(sid, environ, auth):
             'name': user.get('name'),
             'avatar': user.get('avatar')
         })
+        
+        # Join user to their personal room for notifications
+        user_id = str(user['_id'])
+        sio.enter_room(sid, user_id)
+        logger.info(f"User {user_id} joined personal room")
+        
         logger.info(f"Authenticated socket for user {user['email']} (sid={sid})")
         await sio.emit('authenticated', {'status': 'success', 'user': user['name']}, room=sid)
         return True
