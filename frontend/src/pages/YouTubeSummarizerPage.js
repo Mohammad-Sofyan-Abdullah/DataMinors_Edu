@@ -3,12 +3,12 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { 
-  Send, 
-  Download, 
-  RefreshCw, 
-  Trash2, 
-  Youtube, 
+import {
+  Send,
+  Download,
+  RefreshCw,
+  Trash2,
+  Youtube,
   FileText,
   Loader2,
   Copy,
@@ -19,7 +19,8 @@ import {
   X,
   MessageSquare,
   BookOpen,
-  Layers
+  Layers,
+  Presentation
 } from 'lucide-react';
 import { youtubeAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,7 +31,7 @@ import Flashcard from '../components/Flashcard';
 const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOpen = true, onToggleSidebar }) => {
   const queryClient = useQueryClient();
   const messagesEndRef = useRef(null);
-  
+
   const [videoUrl, setVideoUrl] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -41,6 +42,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   const [isExplainingCard, setIsExplainingCard] = useState(false);
+  const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);
 
   // Fetch all sessions
   const { } = useQuery(
@@ -181,21 +183,21 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
   const handleExport = async (format) => {
     try {
       const response = await youtubeAPI.exportSession(selectedSessionId, format);
-      
+
       // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      
+
       const extension = format === 'docx' ? 'docx' : format === 'pdf' ? 'pdf' : 'md';
       const filename = `${selectedSession?.video_title || 'YouTube_Summary'}.${extension}`;
       link.setAttribute('download', filename);
-      
+
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      
+
       toast.success(`Exported as ${format.toUpperCase()}`);
       setShowExportMenu(false);
     } catch (error) {
@@ -213,7 +215,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes}m ${secs}s`;
     } else if (minutes > 0) {
@@ -225,7 +227,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
 
   const handleGenerateFlashcards = async () => {
     if (!selectedSessionId) return;
-    
+
     setIsGeneratingFlashcards(true);
     try {
       // Request 15 as a guide, but AI will determine optimal count based on content
@@ -244,7 +246,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
 
   const handleExplainFlashcard = async (question, answer) => {
     if (!selectedSessionId) return null;
-    
+
     setIsExplainingCard(true);
     try {
       const response = await youtubeAPI.explainFlashcard(selectedSessionId, question, answer);
@@ -269,6 +271,42 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
     }
   };
 
+  // Poll for slides status
+  useEffect(() => {
+    let pollInterval;
+
+    if (selectedSession?.slides_status === 'processing') {
+      setIsGeneratingSlides(true);
+      pollInterval = setInterval(async () => {
+        // Invalidate query to refetch session
+        queryClient.invalidateQueries(['youtube-session', selectedSessionId]);
+      }, 5000);
+    } else {
+      setIsGeneratingSlides(false);
+    }
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [selectedSession?.slides_status, selectedSessionId, queryClient]);
+
+  const handleGenerateSlides = async () => {
+    if (!selectedSessionId) return;
+
+    setIsGeneratingSlides(true);
+    try {
+      // Changed to use longRunningApi in backend, but here call remains same, 
+      // backend now returns immediately with status "processing".
+      const response = await youtubeAPI.generateSlides(selectedSessionId, 5);
+      toast.success('Slide generation started!');
+      // State 'isGeneratingSlides' continues via polling logic
+      queryClient.invalidateQueries(['youtube-session', selectedSessionId]);
+    } catch (error) {
+      toast.error('Failed to start slide generation');
+      setIsGeneratingSlides(false);
+    }
+  };
+
   if (!selectedSessionId) {
     return (
       <div className="flex-1 flex flex-col">
@@ -286,7 +324,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                 </p>
               </div>
             </div>
-            
+
             {/* Sidebar Toggle Button */}
             <button
               onClick={onToggleSidebar}
@@ -333,7 +371,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                   disabled={isProcessing}
                 />
               </div>
-              
+
               <button
                 type="submit"
                 disabled={isProcessing || !videoUrl.trim()}
@@ -409,12 +447,12 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                 {selectedSession.video_title}
               </h1>
               <p className="text-sm text-gray-500">
-                Duration: {formatDuration(selectedSession.video_duration)} • 
+                Duration: {formatDuration(selectedSession.video_duration)} •
                 Created: {new Date(selectedSession.created_at).toLocaleDateString()}
               </p>
             </div>
           </div>
-          
+
           {/* Sidebar Toggle Button */}
           <button
             onClick={onToggleSidebar}
@@ -428,7 +466,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
               <Menu className="h-5 w-5 text-gray-600 group-hover:text-gray-800" />
             )}
           </button>
-          
+
           <div className="flex items-center space-x-2 flex-shrink-0">
             <div className="relative">
               <button
@@ -437,7 +475,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
               >
                 <Download className="h-5 w-5" />
               </button>
-              
+
               {showExportMenu && (
                 <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
                   <button
@@ -464,7 +502,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                 </div>
               )}
             </div>
-            
+
             <button
               onClick={() => regenerateMutation.mutate(selectedSessionId)}
               disabled={regenerateMutation.isLoading}
@@ -472,7 +510,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
             >
               <RefreshCw className={`h-5 w-5 ${regenerateMutation.isLoading ? 'animate-spin' : ''}`} />
             </button>
-            
+
             <button
               onClick={() => {
                 if (window.confirm('Are you sure you want to delete this session?')) {
@@ -494,33 +532,30 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
           <div className="flex space-x-1 p-2">
             <button
               onClick={() => setActiveTab('chat')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'chat'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'chat'
+                ? 'bg-blue-100 text-blue-700'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               <MessageSquare size={18} />
               Chat
             </button>
             <button
               onClick={() => setActiveTab('summaries')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'summaries'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'summaries'
+                ? 'bg-blue-100 text-blue-700'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               <Layers size={18} />
               Summaries
             </button>
             <button
               onClick={() => setActiveTab('flashcards')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'flashcards'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'flashcards'
+                ? 'bg-blue-100 text-blue-700'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               <BookOpen size={18} />
               Flashcards
@@ -529,6 +564,16 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                   {flashcards.length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab('slides')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'slides'
+                ? 'bg-blue-100 text-blue-700'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
+            >
+              <Presentation size={18} />
+              Slides
             </button>
           </div>
         </div>
@@ -544,7 +589,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                   <div className="p-4 border-b border-gray-200">
                     <h2 className="text-lg font-semibold text-gray-900">Summaries</h2>
                   </div>
-                  
+
                   <div className="flex-1 overflow-y-auto p-4 space-y-6">
                     {/* Short Summary */}
                     <div>
@@ -563,7 +608,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                         </ReactMarkdown>
                       </div>
                     </div>
-                    
+
                     {/* Detailed Summary */}
                     <div>
                       <div className="flex items-center justify-between mb-3">
@@ -598,11 +643,10 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                         className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
-                          className={`max-w-3xl rounded-lg px-4 py-3 ${
-                            message.role === 'user'
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-100 text-gray-900'
-                          }`}
+                          className={`max-w-3xl rounded-lg px-4 py-3 ${message.role === 'user'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-900'
+                            }`}
                         >
                           <div className="text-sm prose prose-sm max-w-none">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -610,9 +654,8 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                             </ReactMarkdown>
                           </div>
                           {message.timestamp && (
-                            <div className={`text-xs mt-1 ${
-                              message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
-                            }`}>
+                            <div className={`text-xs mt-1 ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
+                              }`}>
                               {new Date(message.timestamp).toLocaleTimeString()}
                             </div>
                           )}
@@ -686,7 +729,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                     </ReactMarkdown>
                   </div>
                 </div>
-                
+
                 {/* Detailed Summary */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-4">
@@ -753,7 +796,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                         Review the key concepts from this video
                       </p>
                     </div>
-                    
+
                     <Flashcard
                       flashcard={flashcards[currentCardIndex]}
                       cardNumber={currentCardIndex + 1}
@@ -775,6 +818,94 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Slides Tab */}
+          {activeTab === 'slides' && (
+            <div className="flex-1 overflow-y-auto p-8 bg-gray-50">
+              <div className="max-w-4xl mx-auto text-center">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                  <div className="mx-auto w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-6">
+                    <Presentation className="h-10 w-10 text-blue-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    Visual Slides
+                  </h2>
+                  <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                    Generate visual slides with diagrams to present this content. The AI will create a structured presentation with generated images.
+                  </p>
+
+                  {selectedSession.slides_status === 'completed' || selectedSession.slides_pdf_url ? (
+                    <div className="space-y-8">
+                      {/* Images Grid */}
+                      {selectedSession.generated_slide_images && selectedSession.generated_slide_images.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                          {selectedSession.generated_slide_images.map((imgUrl, index) => (
+                            <div key={index} className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-md border hover:shadow-lg transition-shadow">
+                              <img
+                                src={`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}${imgUrl}`}
+                                alt={`Slide ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
+                                Slide {index + 1}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="p-4 bg-green-50 text-green-700 rounded-lg border border-green-200 inline-block mb-4">
+                        Slides are ready!
+                      </div>
+                      <div className="flex gap-4 justify-center">
+                        <a
+                          href={`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}${selectedSession.slides_pdf_url}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                        >
+                          <Download className="h-5 w-5" />
+                          Download PDF
+                        </a>
+                        <button
+                          onClick={handleGenerateSlides}
+                          disabled={isGeneratingSlides}
+                          className="px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                        >
+                          <RefreshCw className={`h-5 w-5 ${isGeneratingSlides ? 'animate-spin' : ''}`} />
+                          Regenerate
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleGenerateSlides}
+                      disabled={isGeneratingSlides || selectedSession.slides_status === 'processing'}
+                      className="px-8 py-4 bg-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 mx-auto"
+                    >
+                      {isGeneratingSlides || selectedSession.slides_status === 'processing' ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          Generating Slides...
+                        </>
+                      ) : (
+                        <>
+                          <Presentation className="h-5 w-5" />
+                          Generate Slides
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {(isGeneratingSlides || selectedSession.slides_status === 'processing') && (
+                    <p className="text-sm text-gray-500 mt-4 animate-pulse">
+                      We are generating images for your slides. This process runs in the background. Note: Large videos may take a few minutes.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}
