@@ -186,7 +186,7 @@ class RoomBase(BaseModel):
     description: Optional[str] = None
 
 class RoomCreate(RoomBase):
-    classroom_id: PyObjectId
+    pass
 
 class RoomUpdate(BaseModel):
     name: Optional[str] = None

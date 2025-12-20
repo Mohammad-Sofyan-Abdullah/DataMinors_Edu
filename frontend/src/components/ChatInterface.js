@@ -42,26 +42,53 @@ const ChatInterface = ({ room, classroom, user }) => {
   );
 
   // Send message mutation
-  const sendMessageMutation = useMutation(chatAPI.sendMessage, {
-    onSuccess: () => {
-      queryClient.invalidateQueries(['messages', room.id || room._id]);
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.detail || 'Failed to send message');
-    },
-  });
+  const sendMessageMutation = useMutation(
+    ({ roomId, content }) => chatAPI.sendMessage(roomId, content),
+    {
+      onSuccess: (response) => {
+        console.log('Message sent successfully:', response);
+        // Optimistically add the message to the UI
+        const newMessage = response.data;
+        setMessages(prev => [...prev, newMessage]);
+        // Also invalidate to refetch in case there are differences
+        queryClient.invalidateQueries(['messages', room.id || room._id]);
+      },
+      onError: (error) => {
+        const errorMessage = error.response?.data?.detail;
+        if (typeof errorMessage === 'string') {
+          toast.error(errorMessage);
+        } else if (Array.isArray(errorMessage)) {
+          const messages = errorMessage.map(err => err.msg || JSON.stringify(err)).join(', ');
+          toast.error(messages);
+        } else {
+          toast.error('Failed to send message');
+        }
+      },
+    }
+  );
 
   // Edit message mutation
-  const editMessageMutation = useMutation(chatAPI.editMessage, {
-    onSuccess: () => {
-      queryClient.invalidateQueries(['messages', room.id || room._id]);
-      setEditingMessage(null);
-      setEditContent('');
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.detail || 'Failed to edit message');
-    },
-  });
+  const editMessageMutation = useMutation(
+    ({ messageId, content }) => chatAPI.editMessage(messageId, content),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['messages', room.id || room._id]);
+        setEditingMessage(null);
+        setEditContent('');
+      },
+      onError: (error) => {
+        const errorMessage = error.response?.data?.detail;
+        if (typeof errorMessage === 'string') {
+          toast.error(errorMessage);
+        } else if (Array.isArray(errorMessage)) {
+          const messages = errorMessage.map(err => err.msg || JSON.stringify(err)).join(', ');
+          toast.error(messages);
+        } else {
+          toast.error('Failed to edit message');
+        }
+      },
+    }
+  );
 
   // Delete message mutation
   const deleteMessageMutation = useMutation(chatAPI.deleteMessage, {
@@ -70,7 +97,15 @@ const ChatInterface = ({ room, classroom, user }) => {
       setShowMessageMenu(null);
     },
     onError: (error) => {
-      toast.error(error.response?.data?.detail || 'Failed to delete message');
+      const errorMessage = error.response?.data?.detail;
+      if (typeof errorMessage === 'string') {
+        toast.error(errorMessage);
+      } else if (Array.isArray(errorMessage)) {
+        const messages = errorMessage.map(err => err.msg || JSON.stringify(err)).join(', ');
+        toast.error(messages);
+      } else {
+        toast.error('Failed to delete message');
+      }
     },
   });
 
@@ -83,7 +118,15 @@ const ChatInterface = ({ room, classroom, user }) => {
         setIsLoadingSummary(false);
       },
       onError: (error) => {
-        toast.error(error.response?.data?.detail || 'Failed to generate summary');
+        const errorMessage = error.response?.data?.detail;
+        if (typeof errorMessage === 'string') {
+          toast.error(errorMessage);
+        } else if (Array.isArray(errorMessage)) {
+          const messages = errorMessage.map(err => err.msg || JSON.stringify(err)).join(', ');
+          toast.error(messages);
+        } else {
+          toast.error('Failed to generate summary');
+        }
         setIsLoadingSummary(false);
       },
     }
@@ -91,8 +134,14 @@ const ChatInterface = ({ room, classroom, user }) => {
 
   // Update messages when initial data loads
   useEffect(() => {
+    console.log('Initial messages loaded:', initialMessages);
     setMessages(initialMessages);
   }, [initialMessages]);
+
+  // Debug: Log messages state changes
+  useEffect(() => {
+    console.log('Messages state updated:', messages);
+  }, [messages]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -104,21 +153,24 @@ const ChatInterface = ({ room, classroom, user }) => {
     if (!socket) return;
 
     const handleNewMessage = (data) => {
-      setMessages(prev => [...prev, data.data.message]);
+      console.log('Received new_message event:', data);
+      setMessages(prev => [...prev, data.message]);
     };
 
     const handleMessageEdited = (data) => {
+      console.log('Received message_edited event:', data);
       setMessages(prev => 
         prev.map(msg => 
-          msg.id === data.data.message.id ? data.data.message : msg
+          msg.id === data.message.id || msg._id === data.message._id ? data.message : msg
         )
       );
     };
 
     const handleMessageDeleted = (data) => {
+      console.log('Received message_deleted event:', data);
       setMessages(prev => 
         prev.map(msg => 
-          msg.id === data.data.message_id ? { ...msg, deleted: true } : msg
+          msg.id === data.message_id || msg._id === data.message_id ? { ...msg, deleted: true } : msg
         )
       );
     };
@@ -152,9 +204,9 @@ const ChatInterface = ({ room, classroom, user }) => {
   };
 
   const handleSaveEdit = () => {
-    if (!editContent.trim()) return;
+    if (!editContent.trim() || !editingMessage) return;
     editMessageMutation.mutate({
-      messageId: editingMessage.id,
+      messageId: editingMessage._id || editingMessage.id,
       content: editContent.trim(),
     });
   };
@@ -237,13 +289,13 @@ const ChatInterface = ({ room, classroom, user }) => {
         ) : (
           messages.map((msg) => (
             <motion.div
-              key={msg.id}
+              key={msg._id || msg.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
             >
               <div className={`relative group max-w-xs lg:max-w-md ${msg.deleted ? 'opacity-50' : ''}`}>
-                {editingMessage?.id === msg.id ? (
+                {(editingMessage?.id === msg.id || editingMessage?._id === msg._id) ? (
                   <div className="bg-white border border-gray-300 rounded-lg p-3">
                     <textarea
                       value={editContent}
@@ -301,13 +353,13 @@ const ChatInterface = ({ room, classroom, user }) => {
                 {!msg.deleted && (canEditMessage(msg) || canDeleteMessage(msg)) && (
                   <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => setShowMessageMenu(showMessageMenu === msg.id ? null : msg.id)}
+                      onClick={() => setShowMessageMenu(showMessageMenu === (msg._id || msg.id) ? null : (msg._id || msg.id))}
                       className="p-1 bg-white rounded-full shadow-md hover:bg-gray-50"
                     >
                       <MoreVertical className="h-4 w-4 text-gray-600" />
                     </button>
                     
-                    {showMessageMenu === msg.id && (
+                    {showMessageMenu === (msg._id || msg.id) && (
                       <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-md shadow-lg border border-gray-200 z-10">
                         {canEditMessage(msg) && (
                           <button
@@ -320,7 +372,7 @@ const ChatInterface = ({ room, classroom, user }) => {
                         )}
                         {canDeleteMessage(msg) && (
                           <button
-                            onClick={() => handleDeleteMessage(msg.id)}
+                            onClick={() => handleDeleteMessage(msg._id || msg.id)}
                             className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                           >
                             <Trash2 className="h-4 w-4 mr-2" />

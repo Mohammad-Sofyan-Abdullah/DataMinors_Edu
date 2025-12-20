@@ -26,7 +26,16 @@ const CreateRoomModal = ({ isOpen, onClose, classroomId }) => {
         setFormData({ name: '', description: '' });
       },
       onError: (error) => {
-        toast.error(error.response?.data?.detail || 'Failed to create room');
+        const errorMessage = error.response?.data?.detail;
+        if (typeof errorMessage === 'string') {
+          toast.error(errorMessage);
+        } else if (Array.isArray(errorMessage)) {
+          // Handle validation errors
+          const messages = errorMessage.map(err => err.msg || JSON.stringify(err)).join(', ');
+          toast.error(messages);
+        } else {
+          toast.error('Failed to create room');
+        }
       },
     }
   );

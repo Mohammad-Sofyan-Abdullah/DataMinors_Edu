@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useQuery } from 'react-query';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from 'react-query';
 import { motion } from 'framer-motion';
 import { 
   Plus, 
@@ -14,9 +14,11 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { classroomsAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../contexts/SocketContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import CreateClassroomModal from '../components/CreateClassroomModal';
 import JoinClassroomModal from '../components/JoinClassroomModal';
+import toast from 'react-hot-toast';
 
 const DashboardPage = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -25,8 +27,9 @@ const DashboardPage = () => {
   const [copiedCode, setCopiedCode] = useState(null);
   
   const { user } = useAuth();
+  const { socket } = useSocket();
   const navigate = useNavigate();
-  // const queryClient = useQueryClient(); // Removed unused variable
+  const queryClient = useQueryClient();
 
   // Fetch classrooms
   const { data: classrooms = [], isLoading } = useQuery(
@@ -36,6 +39,31 @@ const DashboardPage = () => {
       select: (response) => response.data,
     }
   );
+
+  // Listen for classroom_added and classroom_removed events
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleClassroomAdded = (data) => {
+      console.log('Added to classroom:', data);
+      toast.success(`You've been added to ${data.classroom_name}!`);
+      queryClient.invalidateQueries('classrooms');
+    };
+
+    const handleClassroomRemoved = (data) => {
+      console.log('Removed from classroom:', data);
+      toast.error(`You've been removed from ${data.classroom_name}`);
+      queryClient.invalidateQueries('classrooms');
+    };
+
+    socket.on('classroom_added', handleClassroomAdded);
+    socket.on('classroom_removed', handleClassroomRemoved);
+
+    return () => {
+      socket.off('classroom_added', handleClassroomAdded);
+      socket.off('classroom_removed', handleClassroomRemoved);
+    };
+  }, [socket, queryClient]);
 
   // Filter classrooms based on search
   const filteredClassrooms = classrooms.filter(classroom =>
