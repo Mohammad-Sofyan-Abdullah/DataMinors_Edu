@@ -104,6 +104,10 @@ app.include_router(marketplace.router)
 from app.routers import notes
 app.include_router(notes.router)
 
+# Import and include Teachers router
+from app.routers import teachers
+app.include_router(teachers.router)
+
 # Mount static files for message uploads
 import os
 if os.path.exists("static"):

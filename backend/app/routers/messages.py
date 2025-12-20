@@ -47,6 +47,11 @@ async def get_conversations(
                     other_user = await db.users.find_one({"_id": str(other_participant_id)})
                 
                 if other_user:
+                    # Check if other user is a teacher and get their profile
+                    teacher_profile = None
+                    if other_user.get("role") == "teacher":
+                        teacher_profile = await db.teacher_profiles.find_one({"user_id": ObjectId(str(other_participant_id))})
+                    
                     # Get unread message count
                     unread_count = await db.direct_messages.count_documents({
                         "conversation_id": str(conv["_id"]),
@@ -54,13 +59,22 @@ async def get_conversations(
                         "is_read": False
                     })
                     
+                    # Use teacher profile info if available
+                    display_name = other_user.get("name", "")
+                    display_avatar = other_user.get("avatar", "")
+                    
+                    if teacher_profile:
+                        display_name = teacher_profile.get("full_name", display_name)
+                        display_avatar = teacher_profile.get("profile_picture", display_avatar)
+                    
                     result.append({
                         "id": str(conv["_id"]),
                         "other_user": {
                             "id": str(other_user["_id"]),
                             "username": other_user.get("username", ""),
-                            "full_name": other_user.get("full_name", ""),
-                            "avatar": other_user.get("avatar", "")
+                            "full_name": display_name,
+                            "avatar": display_avatar,
+                            "role": other_user.get("role", "student")
                         },
                         "last_message_content": conv.get("last_message_content", ""),
                         "last_message_timestamp": conv.get("last_message_timestamp"),

@@ -243,6 +243,7 @@ export const messagesAPI = {
   sendMessage: (conversationId, formData) =>
     api.post(`/messages/conversations/${conversationId}/messages`, formData),
   deleteMessage: (messageId) => api.delete(`/messages/messages/${messageId}`),
+  getUserInfo: (userId) => api.get(`/auth/user/${userId}`),
 };
 
 // Marketplace API
@@ -280,6 +281,32 @@ export const notesAPI = {
   chatWithDocument: (documentId, message) => api.post(`/notes/documents/${documentId}/chat`, { message }),
   generateNotes: (documentId, prompt) => api.post(`/notes/documents/${documentId}/generate-notes`, { prompt }),
   getChatHistory: (documentId) => api.get(`/notes/documents/${documentId}/chat-history`),
+};
+
+// Teachers API
+export const teachersAPI = {
+  getTeachers: (params = {}) => api.get('/teachers', { params }),
+  getTeacher: (teacherId) => api.get(`/teachers/${teacherId}`),
+  getMyProfile: () => api.get('/teachers/profile'),
+  createProfile: (profileData) => api.post('/teachers/profile', profileData),
+  updateProfile: (profileData) => api.put('/teachers/profile', profileData),
+  
+  // Hire Requests
+  createHireRequest: (hireData) => api.post('/teachers/hire', hireData),
+  getSentHireRequests: () => api.get('/teachers/hire/requests/sent'),
+  getReceivedHireRequests: () => api.get('/teachers/hire/requests/received'),
+  updateHireRequest: (requestId, updateData) => api.put(`/teachers/hire/requests/${requestId}`, updateData),
+  
+  // Sessions
+  getMySessions: () => api.get('/teachers/sessions/my-sessions'),
+  completeSession: (sessionId) => api.put(`/teachers/sessions/${sessionId}/complete`),
+  
+  // Reviews
+  getTeacherReviews: (teacherId, params = {}) => api.get(`/teachers/${teacherId}/reviews`, { params }),
+  createReview: (teacherId, reviewData) => api.post(`/teachers/${teacherId}/reviews`, reviewData),
+  
+  // Analytics
+  getDashboardAnalytics: () => api.get('/teachers/dashboard/analytics'),
 };
 
 export default api;

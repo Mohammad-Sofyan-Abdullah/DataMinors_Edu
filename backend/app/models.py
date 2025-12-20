@@ -48,6 +48,11 @@ class PyObjectId(str):
             ),
         )
 
+# User Role Enum
+class UserRole(str, Enum):
+    STUDENT = "student"
+    TEACHER = "teacher"
+
 # User Models
 class UserBase(BaseModel):
     email: EmailStr
@@ -57,9 +62,11 @@ class UserBase(BaseModel):
     study_interests: List[str] = []
     learning_streaks: int = 0
     student_id: Optional[str] = None
+    role: UserRole = UserRole.STUDENT
 
 class UserCreate(UserBase):
     password: str
+    role: UserRole = UserRole.STUDENT
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -75,6 +82,7 @@ class UserInDB(UserBase):
     friends: List[PyObjectId] = []
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    role: UserRole = UserRole.STUDENT
 
     class Config:
         from_attributes = True
@@ -93,6 +101,7 @@ class User(UserBase):
     friends: List[PyObjectId] = []
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    role: UserRole = UserRole.STUDENT
 
     class Config:
         allow_population_by_field_name = True
@@ -521,6 +530,166 @@ class DocumentChatMessage(BaseModel):
     message: str
     response: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+        populate_by_name = True
+
+# Teacher Profile Models
+class TeacherStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    SUSPENDED = "suspended"
+
+class PricingType(str, Enum):
+    HOURLY = "hourly"
+    PACKAGE = "package"
+    COURSE = "course"
+
+class TeacherProfileBase(BaseModel):
+    full_name: str
+    profile_picture: Optional[str] = None
+    short_bio: Optional[str] = None
+    areas_of_expertise: List[str] = []
+    courses_offered: List[str] = []
+    academic_degrees: List[str] = []
+    certifications: List[str] = []
+    years_of_experience: int = 0
+    languages_spoken: List[str] = []
+    hourly_rate: Optional[float] = None
+    package_pricing: Optional[Dict[str, Any]] = None
+    availability_schedule: Dict[str, Any] = {}
+    online_tools: List[str] = []
+    portfolio_links: List[str] = []
+
+class TeacherProfileCreate(TeacherProfileBase):
+    pass
+
+class TeacherProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    profile_picture: Optional[str] = None
+    short_bio: Optional[str] = None
+    areas_of_expertise: Optional[List[str]] = None
+    courses_offered: Optional[List[str]] = None
+    academic_degrees: Optional[List[str]] = None
+    certifications: Optional[List[str]] = None
+    years_of_experience: Optional[int] = None
+    languages_spoken: Optional[List[str]] = None
+    hourly_rate: Optional[float] = None
+    package_pricing: Optional[Dict[str, Any]] = None
+    availability_schedule: Optional[Dict[str, Any]] = None
+    online_tools: Optional[List[str]] = None
+    portfolio_links: Optional[List[str]] = None
+
+class TeacherProfile(TeacherProfileBase):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId
+    status: TeacherStatus = TeacherStatus.PENDING
+    average_rating: float = 0.0
+    total_reviews: int = 0
+    total_students: int = 0
+    total_sessions: int = 0
+    total_earnings: float = 0.0
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+        populate_by_name = True
+
+# Teacher Review Models
+class TeacherReview(BaseModel):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    teacher_id: PyObjectId
+    student_id: PyObjectId
+    student_name: Optional[str] = None
+    student_avatar: Optional[str] = None
+    rating: int  # 1-5
+    comment: Optional[str] = None
+    session_id: Optional[PyObjectId] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+        populate_by_name = True
+
+class TeacherReviewCreate(BaseModel):
+    rating: int
+    comment: Optional[str] = None
+
+# Hiring/Session Models
+class HireRequestStatus(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
+
+class SessionType(str, Enum):
+    HOURLY = "hourly"
+    COURSE = "course"
+    MONTHLY = "monthly"
+
+class HireRequest(BaseModel):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    teacher_id: PyObjectId
+    student_id: PyObjectId
+    session_type: SessionType
+    subject: str
+    description: Optional[str] = None
+    proposed_schedule: Optional[Dict[str, Any]] = None
+    duration_hours: Optional[int] = None
+    start_time: Optional[datetime] = None  # When session starts
+    end_time: Optional[datetime] = None    # When session ends
+    total_price: float
+    status: HireRequestStatus = HireRequestStatus.PENDING
+    payment_status: str = "pending"  # pending, completed, refunded
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+        populate_by_name = True
+
+class HireRequestCreate(BaseModel):
+    teacher_id: str
+    session_type: SessionType
+    subject: str
+    description: Optional[str] = None
+    proposed_schedule: Optional[Dict[str, Any]] = None
+    duration_hours: Optional[int] = None
+    start_time: Optional[str] = None  # ISO format datetime string
+    end_time: Optional[str] = None    # ISO format datetime string
+
+class HireRequestUpdate(BaseModel):
+    status: Optional[HireRequestStatus] = None
+    proposed_schedule: Optional[Dict[str, Any]] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+
+class TeachingSession(BaseModel):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    hire_request_id: PyObjectId
+    teacher_id: PyObjectId
+    student_id: PyObjectId
+    subject: str
+    scheduled_time: Optional[datetime] = None
+    duration_minutes: int = 60
+    meeting_link: Optional[str] = None
+    notes: Optional[str] = None
+    status: str = "scheduled"  # scheduled, ongoing, completed, cancelled
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:
         allow_population_by_field_name = True

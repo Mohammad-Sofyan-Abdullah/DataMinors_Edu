@@ -25,5 +25,5 @@ librosa
 PyPDF2
 google-generativeai
 python-pptx
-
-
+tiktoken>=0.5.0
+google-genai

@@ -308,6 +308,15 @@ const RegisterPage = () => {
               Sign in here
             </Link>
           </p>
+          <p className="text-sm text-gray-600 mt-2">
+            Are you a teacher?{' '}
+            <Link
+              to="/teacher/register"
+              className="font-medium text-indigo-600 hover:text-indigo-500"
+            >
+              Register as Teacher
+            </Link>
+          </p>
         </div>
       </form>
     </motion.div>
