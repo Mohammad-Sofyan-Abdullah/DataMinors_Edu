@@ -30,32 +30,185 @@ class OCRService:
             logger.error(f"Error encoding image to base64: {e}")
             raise
     
+    def _find_document_contour(self, img):
+        """Find the largest quadrilateral contour (document boundary)"""
+        try:
+            # Convert to grayscale if needed
+            if len(img.shape) == 3:
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = img
+            
+            # Apply Gaussian blur to reduce noise
+            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+            
+            # Edge detection
+            edged = cv2.Canny(blurred, 75, 200)
+            
+            # Find contours
+            contours, _ = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+            contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
+            
+            # Find the largest contour that is a quadrilateral
+            for contour in contours:
+                peri = cv2.arcLength(contour, True)
+                approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
+                
+                if len(approx) == 4:
+                    return approx
+            
+            return None
+        except Exception as e:
+            logger.warning(f"Document contour detection failed: {e}")
+            return None
+    
+    def _order_points(self, pts):
+        """Order points in top-left, top-right, bottom-right, bottom-left order"""
+        rect = np.zeros((4, 2), dtype="float32")
+        
+        # Sum and difference to find corners
+        s = pts.sum(axis=1)
+        diff = np.diff(pts, axis=1)
+        
+        rect[0] = pts[np.argmin(s)]      # Top-left
+        rect[2] = pts[np.argmax(s)]      # Bottom-right
+        rect[1] = pts[np.argmin(diff)]   # Top-right
+        rect[3] = pts[np.argmax(diff)]   # Bottom-left
+        
+        return rect
+    
+    def _perspective_transform(self, img, contour):
+        """Apply perspective transform to get bird's eye view of document"""
+        try:
+            # Reshape contour and order points
+            pts = contour.reshape(4, 2)
+            rect = self._order_points(pts)
+            
+            (tl, tr, br, bl) = rect
+            
+            # Compute width of new image
+            widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
+            widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
+            maxWidth = max(int(widthA), int(widthB))
+            
+            # Compute height of new image
+            heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
+            heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
+            maxHeight = max(int(heightA), int(heightB))
+            
+            # Destination points for perspective transform
+            dst = np.array([
+                [0, 0],
+                [maxWidth - 1, 0],
+                [maxWidth - 1, maxHeight - 1],
+                [0, maxHeight - 1]
+            ], dtype="float32")
+            
+            # Calculate perspective transform matrix and apply it
+            M = cv2.getPerspectiveTransform(rect, dst)
+            warped = cv2.warpPerspective(img, M, (maxWidth, maxHeight))
+            
+            return warped
+        except Exception as e:
+            logger.warning(f"Perspective transform failed: {e}")
+            return img
+    
+    def _remove_shadows(self, img):
+        """Remove shadows from image for better text contrast"""
+        try:
+            # Convert to LAB color space
+            lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+            
+            # Apply CLAHE to L channel
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            l = clahe.apply(l)
+            
+            # Merge channels
+            lab = cv2.merge([l, a, b])
+            
+            # Convert back to BGR
+            result = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+            return result
+        except Exception as e:
+            logger.warning(f"Shadow removal failed: {e}")
+            return img
+    
+    def _enhance_contrast(self, img):
+        """Enhance image contrast using CLAHE"""
+        try:
+            if len(img.shape) == 3:
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = img
+            
+            # Apply CLAHE
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(gray)
+            
+            return enhanced
+        except Exception as e:
+            logger.warning(f"Contrast enhancement failed: {e}")
+            return img if len(img.shape) == 2 else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
+    def _smart_binarize(self, img):
+        """Apply intelligent binarization for better text extraction"""
+        try:
+            # Ensure grayscale
+            if len(img.shape) == 3:
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = img
+            
+            # Apply denoising
+            denoised = cv2.fastNlMeansDenoising(gray, h=10)
+            
+            # Apply Otsu's thresholding
+            _, binary = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            
+            return binary
+        except Exception as e:
+            logger.warning(f"Binarization failed: {e}")
+            return img
+    
     def _preprocess_image_for_ocr(self, image_path: str) -> str:
-        """Preprocess image to improve OCR accuracy"""
+        """Advanced preprocessing with document scanning capabilities"""
         try:
             # Read image
             img = cv2.imread(image_path)
             if img is None:
                 raise ValueError("Could not read image file")
             
-            # Convert to grayscale
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            original_img = img.copy()
             
-            # Apply denoising
-            denoised = cv2.fastNlMeansDenoising(gray)
+            # Step 1: Try to find and correct document perspective
+            contour = self._find_document_contour(img)
+            if contour is not None:
+                logger.info("Document boundary detected, applying perspective correction")
+                img = self._perspective_transform(img, contour)
             
-            # Apply adaptive thresholding to improve text contrast
-            thresh = cv2.adaptiveThreshold(
-                denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
-            )
+            # Step 2: Remove shadows for better uniformity
+            img = self._remove_shadows(img)
+            
+            # Step 3: Enhance contrast
+            enhanced = self._enhance_contrast(img)
+            
+            # Step 4: Apply smart binarization
+            binary = self._smart_binarize(enhanced)
+            
+            # Step 5: Apply sharpening for better text clarity
+            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+            sharpened = cv2.filter2D(binary, -1, kernel)
             
             # Save preprocessed image to temporary file
             temp_path = image_path.replace('.', '_processed.')
-            cv2.imwrite(temp_path, thresh)
+            cv2.imwrite(temp_path, sharpened)
             
+            logger.info("Successfully preprocessed image with document scanning pipeline")
             return temp_path
+            
         except Exception as e:
-            logger.warning(f"Image preprocessing failed, using original: {e}")
+            logger.warning(f"Advanced preprocessing failed, using original: {e}")
             return image_path
     
     async def extract_text_from_image(self, image_path: str) -> str:
@@ -109,11 +262,63 @@ class OCRService:
                 os.remove(processed_image_path)
             
             logger.info(f"Successfully extracted text from image: {len(extracted_text)} characters")
-            return extracted_text
+            
+            # Apply AI formatting to clean up the text
+            formatted_text = await self._format_ocr_text_with_ai(extracted_text)
+            return formatted_text
             
         except Exception as e:
             logger.error(f"Error extracting text from image: {e}")
             return f"OCR extraction failed: {str(e)}"
+    
+    async def _format_ocr_text_with_ai(self, raw_text: str) -> str:
+        """Use AI to clean up and format OCR text"""
+        try:
+            # Skip formatting if text is too short or already well-formatted
+            if len(raw_text.strip()) < 50 or "No readable text found" in raw_text:
+                return raw_text
+            
+            messages = [
+                {
+                    "role": "system",
+                    "content": """You are a text formatting assistant. Your job is to clean up OCR-extracted text and make it readable with proper spacing and structure.
+
+Rules:
+1. Remove duplicate or redundant text
+2. Fix obvious OCR errors and typos
+3. Organize content with clear hierarchical structure
+4. Use proper line breaks and spacing:
+   - Double line break between major sections
+   - Single line break between related items
+   - Indent sub-points with spaces or dashes
+5. Keep all original information - don't remove content
+6. DON'T use markdown symbols (no ##, **, -, etc.)
+7. Use plain text formatting with line breaks and indentation
+8. Make headings stand out with CAPITAL LETTERS or by spacing
+9. Use bullet points with simple characters like • or -
+10. Preserve technical terms and proper nouns exactly as they appear
+11. Keep the output concise but complete"""
+                },
+                {
+                    "role": "user",
+                    "content": f"Please clean up and format this OCR text with proper line breaks and spacing (no markdown):\n\n{raw_text}"
+                }
+            ]
+            
+            response = self.client.chat.completions.create(
+                model="llama-3.3-70b-versatile",  # Using fast model for formatting
+                messages=messages,
+                max_tokens=2000,
+                temperature=0.3
+            )
+            
+            formatted_text = response.choices[0].message.content.strip()
+            logger.info("Successfully formatted OCR text with AI")
+            return formatted_text
+            
+        except Exception as e:
+            logger.warning(f"AI formatting failed, using original text: {e}")
+            return raw_text
     
     def _extract_frames_from_video(self, video_path: str, max_frames: int = 10) -> List[str]:
         """Extract frames from video for OCR processing"""
