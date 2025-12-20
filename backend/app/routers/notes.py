@@ -12,6 +12,7 @@ from app.models import (
 from app.auth import get_current_active_user
 from app.database import get_database
 from app.ai_service import ai_service
+from app.ocr_service import ocr_service
 from bson import ObjectId
 import logging
 import os
@@ -278,16 +279,28 @@ async def upload_document(
     current_user: UserInDB = Depends(get_current_active_user),
     db = Depends(get_database)
 ):
-    """Upload a document file and extract content"""
+    """Upload a document file and extract content (supports images, videos, PDFs, PowerPoints, and more)"""
     try:
-        # Validate file type
-        allowed_extensions = ['.txt', '.docx', '.doc', '.pdf']
+        # Expanded list of allowed file types
+        allowed_extensions = {
+            # Text documents
+            '.txt', '.docx', '.doc', '.pdf', '.rtf',
+            # Presentations
+            '.ppt', '.pptx', '.odp',
+            # Images (for OCR)
+            '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp', '.gif',
+            # Videos (for OCR from frames)
+            '.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v',
+            # Spreadsheets
+            '.xls', '.xlsx', '.ods', '.csv'
+        }
+        
         file_extension = os.path.splitext(file.filename)[1].lower()
         
         if file_extension not in allowed_extensions:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Only TXT, DOCX, DOC, and PDF files are allowed"
+                detail=f"File type {file_extension} not supported. Supported types: {', '.join(sorted(allowed_extensions))}"
             )
         
         # Save file
@@ -297,24 +310,78 @@ async def upload_document(
         
         # Extract content based on file type
         content = ""
+        extraction_method = "unknown"
+        
         try:
             if file_extension == '.txt':
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
+                extraction_method = "text_file"
+                
             elif file_extension in ['.docx', '.doc']:
                 doc = docx.Document(file_path)
                 content = '\n'.join([paragraph.text for paragraph in doc.paragraphs])
+                extraction_method = "docx_parser"
+                
             elif file_extension == '.pdf':
                 with open(file_path, 'rb') as f:
                     pdf_reader = PyPDF2.PdfReader(f)
                     content = '\n'.join([page.extract_text() for page in pdf_reader.pages])
+                extraction_method = "pdf_parser"
+                
+            elif file_extension in ['.ppt', '.pptx']:
+                content = await ocr_service.extract_text_from_presentation(file_path)
+                extraction_method = "presentation_parser"
+                
+            elif ocr_service.is_image_file(file.filename):
+                logger.info(f"Processing image file with OCR: {file.filename}")
+                content = await ocr_service.extract_text_from_image(file_path)
+                extraction_method = "image_ocr"
+                
+            elif ocr_service.is_video_file(file.filename):
+                logger.info(f"Processing video file with OCR: {file.filename}")
+                content = await ocr_service.extract_text_from_video(file_path)
+                extraction_method = "video_ocr"
+                
+            elif file_extension == '.csv':
+                import pandas as pd
+                df = pd.read_csv(file_path)
+                content = df.to_string(index=False)
+                extraction_method = "csv_parser"
+                
+            elif file_extension in ['.xls', '.xlsx']:
+                import pandas as pd
+                df = pd.read_excel(file_path)
+                content = df.to_string(index=False)
+                extraction_method = "excel_parser"
+                
+            else:
+                # Try to read as text file as fallback
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    extraction_method = "text_fallback"
+                except:
+                    content = f"Content extraction not supported for {file_extension} files. You can edit this document manually."
+                    extraction_method = "manual_edit_required"
+                    
         except Exception as e:
             logger.warning(f"Failed to extract content from {file.filename}: {e}")
-            content = f"Content extraction failed for {file.filename}. You can edit this document manually."
+            if ocr_service.is_image_file(file.filename) or ocr_service.is_video_file(file.filename):
+                content = f"OCR extraction failed for {file.filename}. Error: {str(e)}"
+                extraction_method = "ocr_failed"
+            else:
+                content = f"Content extraction failed for {file.filename}. You can edit this document manually."
+                extraction_method = "extraction_failed"
         
         # Use provided title or filename
         document_title = title or os.path.splitext(file.filename)[0]
         
+        # Add extraction info to content if OCR was used
+        if extraction_method in ["image_ocr", "video_ocr"]:
+            if content and "extraction failed" not in content.lower():
+                content = f"[Extracted using OCR from {extraction_method.replace('_', ' ')}]\n\n{content}"
+            
         # Create document
         document_dict = {
             "user_id": ObjectId(current_user.id),
@@ -323,6 +390,8 @@ async def upload_document(
             "file_url": file_path,
             "file_name": file.filename,
             "file_size": os.path.getsize(file_path),
+            "file_type": file_extension,
+            "extraction_method": extraction_method,
             "status": DocumentStatus.DRAFT,
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
@@ -334,7 +403,7 @@ async def upload_document(
         # Convert ObjectId to string for response
         document_dict["id"] = str(result.inserted_id)
         
-        logger.info(f"Uploaded document {result.inserted_id} for user {current_user.id}")
+        logger.info(f"Uploaded document {result.inserted_id} for user {current_user.id} using {extraction_method}")
         return Document(**document_dict)
         
     except HTTPException:
@@ -417,7 +486,95 @@ async def chat_with_document(
             detail="Failed to process chat message"
         )
 
-@router.post("/documents/{document_id}/generate-notes")
+@router.post("/documents/{document_id}/reprocess-ocr")
+async def reprocess_document_with_ocr(
+    document_id: str,
+    current_user: UserInDB = Depends(get_current_active_user),
+    db = Depends(get_database)
+):
+    """Reprocess a document using OCR if initial extraction failed"""
+    try:
+        document_object_id = ObjectId(document_id)
+    except:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid document ID"
+        )
+    
+    # Get document
+    document = await db.documents.find_one({
+        "_id": document_object_id,
+        "user_id": ObjectId(current_user.id)
+    })
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    file_path = document.get("file_url")
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Original file not found"
+        )
+    
+    try:
+        filename = document.get("file_name", "")
+        content = ""
+        extraction_method = "reprocessed_unknown"
+        
+        if ocr_service.is_image_file(filename):
+            logger.info(f"Reprocessing image file with OCR: {filename}")
+            content = await ocr_service.extract_text_from_image(file_path)
+            extraction_method = "reprocessed_image_ocr"
+            
+        elif ocr_service.is_video_file(filename):
+            logger.info(f"Reprocessing video file with OCR: {filename}")
+            content = await ocr_service.extract_text_from_video(file_path)
+            extraction_method = "reprocessed_video_ocr"
+            
+        elif ocr_service.is_presentation_file(filename):
+            logger.info(f"Reprocessing presentation file: {filename}")
+            content = await ocr_service.extract_text_from_presentation(file_path)
+            extraction_method = "reprocessed_presentation"
+            
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File type not supported for OCR reprocessing"
+            )
+        
+        # Add reprocessing info to content
+        if content and "extraction failed" not in content.lower():
+            content = f"[Reprocessed using OCR - {extraction_method.replace('_', ' ')}]\n\n{content}"
+        
+        # Update document
+        await db.documents.update_one(
+            {"_id": document_object_id},
+            {
+                "$set": {
+                    "content": content,
+                    "extraction_method": extraction_method,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        return {
+            "message": "Document reprocessed successfully",
+            "extraction_method": extraction_method,
+            "content_length": len(content),
+            "content_preview": content[:200] + "..." if len(content) > 200 else content
+        }
+        
+    except Exception as e:
+        logger.error(f"Error reprocessing document with OCR: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reprocess document: {str(e)}"
+        )
 async def generate_notes(
     document_id: str,
     prompt: str = Body(..., embed=True),
