@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useParams, useNavigate } from 'react-router-dom';
+import StyledButton from '../components/Button';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FileText,
@@ -32,7 +33,6 @@ import {
 import { notesAPI } from '../utils/api';
 import api from '../utils/api'; // Import default api for baseURL
 import toast from 'react-hot-toast';
-import Button from '../components/Button';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ShareToFriendModal from '../components/ShareToFriendModal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -236,6 +236,22 @@ const DocumentSessionPage = () => {
         toast.success('Copied to clipboard');
     };
 
+    // Helper to strip markdown formatting
+    const stripMarkdown = (text) => {
+        if (!text) return '';
+        return text
+            .replace(/\*\*(.+?)\*\*/g, '$1')  // Remove bold **text**
+            .replace(/\*(.+?)\*/g, '$1')      // Remove italic *text*
+            .replace(/__(.+?)__/g, '$1')      // Remove bold __text__
+            .replace(/_(.+?)_/g, '$1')        // Remove italic _text_
+            .replace(/#+\s+/g, '')            // Remove headings # 
+            .replace(/^[-*+]\s+/gm, '')       // Remove list markers
+            .replace(/^\d+\.\s+/gm, '')      // Remove numbered lists
+            .replace(/\[(.+?)\]\(.+?\)/g, '$1') // Remove links [text](url)
+            .replace(/`(.+?)`/g, '$1')        // Remove inline code `code`
+            .replace(/^>\s+/gm, '');          // Remove blockquotes
+    };
+
     if (isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -249,12 +265,12 @@ const DocumentSessionPage = () => {
             <div className="min-h-screen flex flex-col items-center justify-center">
                 <FileText className="h-16 w-16 text-gray-300 mb-4" />
                 <h2 className="text-xl font-semibold text-gray-700">Session not found</h2>
-                <Button
+                <StyledButton
                     onClick={() => navigate('/notes')}
                     className="mt-4"
                 >
                     Back to Notes
-                </Button>
+                </StyledButton>
             </div>
         );
     }
@@ -290,7 +306,7 @@ const DocumentSessionPage = () => {
                             </div>
                         </div>
                         <div className="flex items-center space-x-3 flex-none">
-                            <Button
+                            <StyledButton
                                 onClick={() => handleShare('document_session')}
                                 variant="outline"
                                 className="bg-white"
@@ -298,15 +314,15 @@ const DocumentSessionPage = () => {
                                 leftIcon={<Share2 className="h-4 w-4" />}
                             >
                                 Share
-                            </Button>
-                            <Button
+                            </StyledButton>
+                            <StyledButton
                                 onClick={() => setShowDeleteModal(true)}
                                 variant="ghost"
                                 className="p-2 h-auto text-red-600 hover:bg-red-50 hover:text-red-700"
                                 title="Delete Session"
                             >
                                 <Trash2 className="h-5 w-5" />
-                            </Button>
+                            </StyledButton>
                         </div>
                     </div>
 
@@ -429,14 +445,14 @@ const DocumentSessionPage = () => {
                                             className="flex-1 input"
                                             disabled={chatMutation.isLoading}
                                         />
-                                        <Button
+                                        <StyledButton
                                             type="submit"
                                             disabled={!chatMessage.trim() || chatMutation.isLoading}
                                             isLoading={chatMutation.isLoading}
                                             leftIcon={!chatMutation.isLoading && <Send className="h-4 w-4" />}
                                         >
                                             Send
-                                        </Button>
+                                        </StyledButton>
                                     </div>
                                 </form>
                             </motion.div>
@@ -460,7 +476,7 @@ const DocumentSessionPage = () => {
                                         <p className="text-gray-500 mb-4">
                                             Generate AI-powered summaries of your document
                                         </p>
-                                        <Button
+                                        <StyledButton
                                             onClick={() => summarizeMutation.mutate()}
                                             disabled={summarizeMutation.isLoading}
                                             isLoading={summarizeMutation.isLoading}
@@ -468,7 +484,7 @@ const DocumentSessionPage = () => {
                                             leftIcon={!summarizeMutation.isLoading && <Sparkles className="h-4 w-4" />}
                                         >
                                             Generate Summary
-                                        </Button>
+                                        </StyledButton>
                                     </div>
                                 ) : (
                                     <>
@@ -491,7 +507,7 @@ const DocumentSessionPage = () => {
                                                 </button>
                                             </div>
                                             <div className="p-4">
-                                                <p className="text-gray-700 whitespace-pre-wrap">{session.short_summary}</p>
+                                                <p className="text-gray-700 whitespace-pre-wrap">{stripMarkdown(session.short_summary)}</p>
                                             </div>
                                         </div>
 
@@ -524,7 +540,7 @@ const DocumentSessionPage = () => {
                                                 </div>
                                             </div>
                                             <div className="p-4">
-                                                <p className="text-gray-700 whitespace-pre-wrap">{session.detailed_summary}</p>
+                                                <p className="text-gray-700 whitespace-pre-wrap">{stripMarkdown(session.detailed_summary)}</p>
                                             </div>
                                         </div>
                                     </>
@@ -554,7 +570,7 @@ const DocumentSessionPage = () => {
                                             </p>
                                         </div>
                                     </div>
-                                    <Button
+                                    <StyledButton
                                         onClick={() => flashcardsMutation.mutate()}
                                         disabled={flashcardsMutation.isLoading}
                                         variant="outline"
@@ -563,7 +579,7 @@ const DocumentSessionPage = () => {
                                         isLoading={flashcardsMutation.isLoading}
                                     >
                                         Regenerate
-                                    </Button>
+                                    </StyledButton>
                                 </div>
 
                                 {/* Main Content */}
@@ -577,7 +593,7 @@ const DocumentSessionPage = () => {
                                             <p className="text-gray-500 mb-8 leading-relaxed">
                                                 Generate flashcards from your document to start testing your knowledge and memorizing key concepts.
                                             </p>
-                                            <Button
+                                            <StyledButton
                                                 onClick={() => flashcardsMutation.mutate()}
                                                 disabled={flashcardsMutation.isLoading}
                                                 className="w-full justify-center py-3 text-base shadow-lg shadow-primary-500/20"
@@ -585,7 +601,7 @@ const DocumentSessionPage = () => {
                                                 leftIcon={!flashcardsMutation.isLoading && <Sparkles className="h-5 w-5" />}
                                             >
                                                 Generate Flashcards
-                                            </Button>
+                                            </StyledButton>
                                         </div>
                                     ) : (
                                         <div className="w-full max-w-3xl flex flex-col gap-8">
@@ -708,7 +724,7 @@ const DocumentSessionPage = () => {
                                         </h3>
                                         <p className="text-sm text-gray-600">Test your knowledge of the document</p>
                                     </div>
-                                    <Button
+                                    <StyledButton
                                         onClick={() => quizMutation.mutate()}
                                         disabled={quizMutation.isLoading}
                                         variant="outline"
@@ -716,7 +732,7 @@ const DocumentSessionPage = () => {
                                         isLoading={quizMutation.isLoading}
                                     >
                                         {session?.quiz?.questions?.length ? 'New Quiz' : 'Generate'}
-                                    </Button>
+                                    </StyledButton>
                                 </div>
 
                                 {(!session?.quiz?.questions || session.quiz.questions.length === 0) ? (
@@ -729,14 +745,14 @@ const DocumentSessionPage = () => {
                                                 : 'Generate a summary first, then create a quiz'}
                                         </p>
                                         {session.detailed_summary && (
-                                            <Button
+                                            <StyledButton
                                                 onClick={() => quizMutation.mutate()}
                                                 disabled={quizMutation.isLoading}
                                                 className="mx-auto"
                                                 leftIcon={<Sparkles className="h-4 w-4" />}
                                             >
                                                 Generate Quiz
-                                            </Button>
+                                            </StyledButton>
                                         )}
                                     </div>
                                 ) : !showQuizResults ? (
@@ -788,11 +804,11 @@ const DocumentSessionPage = () => {
                                                 Previous
                                             </button>
                                             {currentQuizIndex === session.quiz.questions.length - 1 ? (
-                                                <Button
+                                                <StyledButton
                                                     onClick={() => setShowQuizResults(true)}
                                                 >
                                                     Submit Quiz
-                                                </Button>
+                                                </StyledButton>
                                             ) : (
                                                 <button
                                                     onClick={() => setCurrentQuizIndex(prev => prev + 1)}

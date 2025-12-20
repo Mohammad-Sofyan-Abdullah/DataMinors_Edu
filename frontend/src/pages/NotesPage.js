@@ -343,9 +343,10 @@ const NotesPage = () => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        e.nativeEvent.stopImmediatePropagation();
                         handleDeleteDocument(doc);
                       }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-100 rounded text-red-600"
+                      className="p-1.5 rounded-full text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors z-20 relative"
                       title="Delete Document"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -495,7 +496,7 @@ const NotesPage = () => {
                       className="input w-full"
                     />
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      <strong>Supported formats:</strong> Documents (TXT, DOCX, PDF, RTF), Presentations (PPT, PPTX), 
+                      <strong>Supported formats:</strong> Documents (TXT, DOCX, PDF, RTF), Presentations (PPT, PPTX),
                       Images (JPG, PNG, etc.), Videos (MP4, AVI, etc.), Spreadsheets (XLS, CSV)
                       <br />
                       <span className="text-blue-600 dark:text-blue-400 font-medium">
@@ -532,24 +533,24 @@ const NotesPage = () => {
 
       {/* Delete Document Confirmation Modal */}
       <ConfirmModal
-        isOpen={!!documentToDelete}
-        onClose={() => setDocumentToDelete(null)}
+        open={!!documentToDelete}
+        onCancel={() => setDocumentToDelete(null)}
         onConfirm={confirmDelete}
         title="Delete Document"
         message={`Are you sure you want to delete "${documentToDelete?.title}"? This will also delete the associated AI session and cannot be undone.`}
-        confirmText="Delete"
-        isLoading={deleteDocumentMutation.isLoading}
+        confirmLabel="Delete"
+        loading={deleteDocumentMutation.isLoading}
       />
 
       {/* Delete Session Confirmation Modal */}
       <ConfirmModal
-        isOpen={!!sessionToDelete}
-        onClose={() => setSessionToDelete(null)}
+        open={!!sessionToDelete}
+        onCancel={() => setSessionToDelete(null)}
         onConfirm={confirmDeleteSession}
         title="Delete AI Session"
         message={`Are you sure you want to delete the AI session for "${sessionToDelete?.document_title}"? This will delete all generated summaries, flashcards, and quizzes.`}
-        confirmText="Delete"
-        isLoading={deleteSessionMutation.isLoading}
+        confirmLabel="Delete"
+        loading={deleteSessionMutation.isLoading}
       />
     </div>
   );
