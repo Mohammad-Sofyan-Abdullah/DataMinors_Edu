@@ -396,7 +396,7 @@ Please provide a comprehensive educational explanation that helps the student un
                 content = content[:15000] + "...(truncated)"
             
             response = self.client.chat.completions.create(
-                model="openai/gpt-oss-120b",
+                model="openai/gpt-oss-20b",
                 messages=[
                     {
                         "role": "system",
@@ -404,24 +404,23 @@ Please provide a comprehensive educational explanation that helps the student un
 
 GUIDELINES:
 - Create well-organized notes with clear headings and subheadings
-- Use bullet points, numbered lists, and formatting for clarity
+- Use bullet points, numbered lists, and simple formatting for clarity
 - Focus on key concepts, definitions, and important information
 - Make notes concise but comprehensive
-- Use markdown formatting for structure
+- Use PLAIN TEXT formatting only - no markdown symbols
 - Include examples when relevant
 - Organize information logically
 
 FORMATTING RULES:
-- Use # for main headings
-- Use ## for subheadings  
-- Use ### for sub-subheadings
-- Use - or * for bullet points
-- Use **bold** for emphasis
-- Use `code` for technical terms
-- Use > for important quotes or definitions
+- Use simple text headings (no # symbols)
+- Use - or * for bullet points (but keep it simple)
+- Use CAPITAL LETTERS for emphasis instead of **bold**
+- Use simple indentation for structure
+- NO markdown symbols like #, **, `, >, etc.
+- Keep formatting clean and readable
 
 RESPONSE FORMAT:
-Return only the formatted notes content, ready to be inserted into the document."""
+Return only clean, plain text notes that are easy to read and edit in a simple text editor."""
                     },
                     {
                         "role": "user",
@@ -432,7 +431,7 @@ User Request: {user_prompt}
 Document Content:
 {content}
 
-Please generate structured notes based on the user's request and the document content above."""
+Please generate clean, well-structured notes based on the user's request and the document content above. Use only plain text formatting - no markdown symbols."""
                     }
                 ],
                 temperature=0.3,
@@ -440,12 +439,42 @@ Please generate structured notes based on the user's request and the document co
             )
             
             notes = response.choices[0].message.content.strip()
-            logger.info("Successfully generated notes from document")
+            
+            # Clean up any remaining markdown symbols
+            notes = self._clean_markdown_symbols(notes)
+            
+            logger.info("Successfully generated clean notes from document")
             return notes
             
         except Exception as e:
             logger.error(f"Error generating notes from document: {e}")
             return f"I apologize, but I encountered an error while generating notes: {str(e)}"
+
+    def _clean_markdown_symbols(self, text: str) -> str:
+        """Remove markdown symbols and clean up text formatting"""
+        import re
+        
+        # Remove markdown headers
+        text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
+        
+        # Remove bold/italic markers
+        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+        text = re.sub(r'\*(.*?)\*', r'\1', text)
+        text = re.sub(r'__(.*?)__', r'\1', text)
+        text = re.sub(r'_(.*?)_', r'\1', text)
+        
+        # Remove code markers
+        text = re.sub(r'`(.*?)`', r'\1', text)
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        
+        # Remove blockquote markers
+        text = re.sub(r'^>\s*', '', text, flags=re.MULTILINE)
+        
+        # Clean up extra whitespace
+        text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)
+        text = text.strip()
+        
+        return text
 
     async def chat_with_document(self, content: str, document_title: str, user_message: str, chat_history: List[Dict] = None) -> str:
         """Chat with AI about the document content"""
@@ -477,8 +506,9 @@ RESPONSE GUIDELINES:
 - Base your responses on the document content provided
 - Be helpful, educational, and encouraging
 - Use clear, student-friendly language
-- When generating content to be inserted, use proper markdown formatting
-- If asked to create notes or summaries, make them well-structured and comprehensive"""
+- When generating content to be inserted, use PLAIN TEXT only - no markdown symbols
+- If asked to create notes or summaries, make them clean and easy to read
+- Keep responses conversational and helpful"""
                 }
             ]
             
@@ -492,14 +522,18 @@ RESPONSE GUIDELINES:
             messages.append({"role": "user", "content": user_message})
             
             response = self.client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="openai/gpt-oss-20b",
                 messages=messages,
                 temperature=0.4,
                 max_tokens=1500
             )
             
             ai_response = response.choices[0].message.content.strip()
-            logger.info("Successfully generated chat response for document")
+            
+            # Clean up any markdown symbols in the response
+            ai_response = self._clean_markdown_symbols(ai_response)
+            
+            logger.info("Successfully generated clean chat response for document")
             return ai_response
             
         except Exception as e:
