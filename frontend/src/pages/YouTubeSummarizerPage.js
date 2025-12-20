@@ -24,13 +24,15 @@ import {
   ExternalLink,
   Clock,
   Star,
-  TrendingUp
+  TrendingUp,
+  Share2
 } from 'lucide-react';
 import { youtubeAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Flashcard from '../components/Flashcard';
+import ShareToFriendModal from '../components/ShareToFriendModal';
 
 const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOpen = true, onToggleSidebar }) => {
   const queryClient = useQueryClient();
@@ -49,6 +51,10 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
   const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);
   const [relatedVideos, setRelatedVideos] = useState([]);
   const [isGeneratingRelatedVideos, setIsGeneratingRelatedVideos] = useState(false);
+
+  // Share modal state
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareContent, setShareContent] = useState(null);
 
   // Fetch all sessions
   const { } = useQuery(
@@ -287,6 +293,95 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
     }
   };
 
+  // Extract video ID from YouTube URL for thumbnail
+  const extractVideoId = (url) => {
+    if (!url) return null;
+    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
+    return match ? match[1] : null;
+  };
+
+  // Share handlers
+  const handleShareSummary = () => {
+    const videoId = extractVideoId(selectedSession?.video_url);
+    setShareContent({
+      contentType: 'youtube_summary',
+      contentData: {
+        title: selectedSession?.video_title || 'YouTube Summary',
+        description: selectedSession?.short_summary?.substring(0, 200) + '...',
+        preview_text: selectedSession?.detailed_summary?.substring(0, 500),
+        preview_image_url: videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : null,
+        source_url: selectedSession?.video_url,
+        source_id: selectedSession?.id || selectedSessionId,
+      }
+    });
+    setShareModalOpen(true);
+  };
+
+  const handleShareFlashcards = () => {
+    const videoId = extractVideoId(selectedSession?.video_url);
+    setShareContent({
+      contentType: 'flashcards',
+      contentData: {
+        title: `Flashcards: ${selectedSession?.video_title || 'Video'}`,
+        description: `${flashcards?.length || 0} flashcards for studying`,
+        preview_image_url: videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : null,
+        source_id: selectedSession?.id || selectedSessionId,
+        metadata: {
+          flashcards: flashcards?.slice(0, 5),  // Include first 5 flashcards as preview
+          total_count: flashcards?.length || 0
+        }
+      }
+    });
+    setShareModalOpen(true);
+  };
+
+  const handleShareSlides = () => {
+    const videoId = extractVideoId(selectedSession?.video_url);
+    setShareContent({
+      contentType: 'slides',
+      contentData: {
+        title: `Slides: ${selectedSession?.video_title || 'Video'}`,
+        description: `Presentation slides generated from video`,
+        preview_image_url: selectedSession?.generated_slide_images?.[0] ||
+          (videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : null),
+        source_id: selectedSession?.id || selectedSessionId,
+        metadata: {
+          slide_images: selectedSession?.generated_slide_images?.slice(0, 3),  // First 3 slides as preview
+          total_slides: selectedSession?.generated_slide_images?.length || 0
+        }
+      }
+    });
+    setShareModalOpen(true);
+  };
+
+  // Share the full session (can be imported by friend)
+  const handleShareSession = () => {
+    const videoId = extractVideoId(selectedSession?.video_url);
+    const chatCount = selectedSession?.chat_history?.length || 0;
+    const flashcardsCount = flashcards?.length || 0;
+
+    setShareContent({
+      contentType: 'youtube_session',
+      contentData: {
+        title: selectedSession?.video_title || 'YouTube Session',
+        description: `Complete session with ${chatCount > 0 ? `${chatCount} chat messages` : 'summary'}${flashcardsCount > 0 ? `, ${flashcardsCount} flashcards` : ''}`,
+        preview_text: selectedSession?.short_summary?.substring(0, 300),
+        preview_image_url: videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : null,
+        source_url: selectedSession?.video_url,
+        source_id: selectedSession?.id || selectedSessionId,
+        metadata: {
+          has_chat: chatCount > 0,
+          chat_count: chatCount,
+          has_flashcards: flashcardsCount > 0,
+          flashcards_count: flashcardsCount,
+          has_slides: !!selectedSession?.slides_pdf_url,
+          video_duration: selectedSession?.video_duration
+        }
+      }
+    });
+    setShareModalOpen(true);
+  };
+
   // Poll for slides status
   useEffect(() => {
     let pollInterval;
@@ -520,6 +615,16 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
           </button>
 
           <div className="flex items-center space-x-2 flex-shrink-0">
+            {/* Share Session Button */}
+            <button
+              onClick={handleShareSession}
+              className="flex items-center gap-2 px-3 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+              title="Share session with friends"
+            >
+              <Share2 className="h-4 w-4" />
+              <span className="text-sm font-medium hidden sm:inline">Share Session</span>
+            </button>
+
             <div className="relative">
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
@@ -783,12 +888,23 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-semibold text-gray-900">Quick Summary</h2>
-                    <button
-                      onClick={() => copyToClipboard(selectedSession.short_summary)}
-                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
-                    >
-                      <Copy className="h-5 w-5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleShareSummary}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                        title="Share to friends"
+                      >
+                        <Share2 className="h-4 w-4" />
+                        <span className="text-sm font-medium">Share</span>
+                      </button>
+                      <button
+                        onClick={() => copyToClipboard(selectedSession.short_summary)}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                        title="Copy to clipboard"
+                      >
+                        <Copy className="h-5 w-5" />
+                      </button>
+                    </div>
                   </div>
                   <div className="prose prose-base max-w-none text-gray-700">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -859,9 +975,16 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                       <h2 className="text-2xl font-bold text-gray-900 mb-2">
                         Study Flashcards
                       </h2>
-                      <p className="text-gray-600">
+                      <p className="text-gray-600 mb-4">
                         Review the key concepts from this video
                       </p>
+                      <button
+                        onClick={handleShareFlashcards}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors"
+                      >
+                        <Share2 className="h-4 w-4" />
+                        <span className="text-sm font-medium">Share Flashcards</span>
+                      </button>
                     </div>
 
                     <Flashcard
@@ -1113,6 +1236,17 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
 
         </div>
       </div>
+
+      {/* Share Modal */}
+      <ShareToFriendModal
+        isOpen={shareModalOpen}
+        onClose={() => {
+          setShareModalOpen(false);
+          setShareContent(null);
+        }}
+        contentType={shareContent?.contentType}
+        contentData={shareContent?.contentData}
+      />
     </div>
   );
 };

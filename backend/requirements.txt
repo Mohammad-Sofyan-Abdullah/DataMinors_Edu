@@ -25,5 +25,5 @@ librosa
 PyPDF2
 google-generativeai
 python-pptx
-
+google-genai 
 

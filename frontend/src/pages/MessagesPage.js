@@ -18,9 +18,15 @@ import {
   Bot,
   Trash2,
   Download,
-  MessageSquare
+  MessageSquare,
+  Youtube,
+  BookOpen,
+  Layers,
+  ExternalLink,
+  Share2,
+  PlayCircle
 } from 'lucide-react';
-import { messagesAPI, friendsAPI } from '../utils/api';
+import { messagesAPI, friendsAPI, youtubeAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import '../index.css';
@@ -313,6 +319,188 @@ const MessagesPage = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // Render shared content based on type
+  const renderSharedContent = (sharedContent, isOwnMessage) => {
+    if (!sharedContent) return null;
+
+    const contentType = sharedContent.content_type;
+
+    // Get the appropriate icon and colors based on content type
+    const getContentStyle = () => {
+      switch (contentType) {
+        case 'youtube_summary':
+        case 'youtube_video':
+          return {
+            icon: <Youtube className="w-4 h-4 text-red-500" />,
+            bgColor: 'bg-red-50',
+            borderColor: 'border-red-200',
+            label: 'YouTube Summary'
+          };
+        case 'youtube_session':
+          return {
+            icon: <PlayCircle className="w-4 h-4 text-red-600" />,
+            bgColor: 'bg-gradient-to-br from-red-50 to-orange-50',
+            borderColor: 'border-red-300',
+            label: 'YouTube Session'
+          };
+        case 'flashcards':
+          return {
+            icon: <BookOpen className="w-4 h-4 text-purple-500" />,
+            bgColor: 'bg-purple-50',
+            borderColor: 'border-purple-200',
+            label: 'Flashcards'
+          };
+        case 'slides':
+          return {
+            icon: <Layers className="w-4 h-4 text-blue-500" />,
+            bgColor: 'bg-blue-50',
+            borderColor: 'border-blue-200',
+            label: 'Slides'
+          };
+        case 'notes':
+          return {
+            icon: <FileText className="w-4 h-4 text-green-500" />,
+            bgColor: 'bg-green-50',
+            borderColor: 'border-green-200',
+            label: 'Notes'
+          };
+        case 'ai_chat':
+          return {
+            icon: <Bot className="w-4 h-4 text-indigo-500" />,
+            bgColor: 'bg-indigo-50',
+            borderColor: 'border-indigo-200',
+            label: 'AI Chat'
+          };
+        default:
+          return {
+            icon: <Share2 className="w-4 h-4 text-gray-500" />,
+            bgColor: 'bg-gray-50',
+            borderColor: 'border-gray-200',
+            label: 'Shared Content'
+          };
+      }
+    };
+
+    // Handle import session
+    const handleImportSession = async () => {
+      if (!sharedContent.source_id) {
+        toast.error('Session ID not available');
+        return;
+      }
+
+      try {
+        toast.loading('Importing session...', { id: 'import-session' });
+        const response = await youtubeAPI.importSession(sharedContent.source_id);
+        toast.dismiss('import-session');
+
+        if (response.data.already_owned) {
+          toast.success('Opening your session...');
+          navigate(`/youtube-summarizer?session=${sharedContent.source_id}`);
+        } else if (response.data.already_imported || response.data.imported) {
+          toast.success('Session imported! Opening...');
+          navigate(`/youtube-summarizer?session=${response.data.session_id}`);
+        }
+      } catch (error) {
+        toast.dismiss('import-session');
+        console.error('Import error:', error);
+        toast.error('Failed to import session');
+      }
+    };
+
+    const style = getContentStyle();
+
+    return (
+      <div className={`rounded-lg border ${style.borderColor} ${style.bgColor} p-3 max-w-xs mb-2`}>
+        {/* Preview Image */}
+        {sharedContent.preview_image_url && (
+          <img
+            src={sharedContent.preview_image_url}
+            alt={sharedContent.title}
+            className="w-full h-24 object-cover rounded-lg mb-2"
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
+        )}
+
+        {/* Type Badge */}
+        <div className="flex items-center gap-2 mb-2">
+          {style.icon}
+          <span className="text-xs font-medium text-gray-500">{style.label}</span>
+        </div>
+
+        {/* Title */}
+        <h4 className="font-semibold text-sm text-gray-900 line-clamp-2 mb-1">
+          {sharedContent.title}
+        </h4>
+
+        {/* Description */}
+        {sharedContent.description && (
+          <p className="text-xs text-gray-600 line-clamp-2 mb-2">
+            {sharedContent.description}
+          </p>
+        )}
+
+        {/* Flashcards Preview */}
+        {contentType === 'flashcards' && sharedContent.metadata?.total_count && (
+          <div className="text-xs text-purple-600 font-medium">
+            📚 {sharedContent.metadata.total_count} flashcards
+          </div>
+        )}
+
+        {/* Slides Preview */}
+        {contentType === 'slides' && sharedContent.metadata?.total_slides && (
+          <div className="text-xs text-blue-600 font-medium">
+            🎴 {sharedContent.metadata.total_slides} slides
+          </div>
+        )}
+
+        {/* YouTube Session Preview */}
+        {contentType === 'youtube_session' && sharedContent.metadata && (
+          <div className="flex flex-wrap gap-2 text-xs mb-2">
+            {sharedContent.metadata.has_chat && (
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full">
+                💬 {sharedContent.metadata.chat_count} chats
+              </span>
+            )}
+            {sharedContent.metadata.has_flashcards && (
+              <span className="px-2 py-0.5 bg-purple-100 text-purple-600 rounded-full">
+                📚 {sharedContent.metadata.flashcards_count} cards
+              </span>
+            )}
+            {sharedContent.metadata.has_slides && (
+              <span className="px-2 py-0.5 bg-green-100 text-green-600 rounded-full">
+                🎴 Slides
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Import & Open Button for YouTube Sessions */}
+        {contentType === 'youtube_session' && sharedContent.source_id && (
+          <button
+            onClick={handleImportSession}
+            className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+          >
+            <Download className="w-4 h-4" />
+            Import & Open
+          </button>
+        )}
+
+        {/* Source Link */}
+        {sharedContent.source_url && contentType !== 'youtube_session' && (
+          <a
+            href={sharedContent.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 mt-2"
+          >
+            <ExternalLink className="w-3 h-3" />
+            View Original
+          </a>
+        )}
+      </div>
+    );
+  };
+
   const renderMessage = (msg, index) => {
     // Comprehensive safety checks
     if (!msg) {
@@ -367,6 +555,11 @@ const MessagesPage = () => {
               <Bot className="w-3 h-3 text-purple-600" />
               <span className="text-xs font-medium text-purple-600">AI Assistant</span>
             </div>
+          )}
+
+          {/* Shared Content */}
+          {msg.message_type === 'shared_content' && msg.shared_content && (
+            renderSharedContent(msg.shared_content, isOwnMessage)
           )}
 
           {/* File/Media Content */}
