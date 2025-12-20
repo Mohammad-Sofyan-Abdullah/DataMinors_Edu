@@ -30,3 +30,4 @@ google-genai
 opencv-python
 pillow
 numpy
+scikit-image

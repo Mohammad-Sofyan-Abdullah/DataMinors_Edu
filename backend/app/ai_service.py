@@ -2,7 +2,6 @@ from groq import Groq
 from app.config import settings
 import logging
 from typing import List, Dict, Any, Optional
-import google.generativeai as google_generativeai_old
 from google import genai
 import io
 from reportlab.lib.pagesizes import letter, landscape
@@ -17,7 +16,6 @@ class AIService:
     def __init__(self):
         self.client = Groq(api_key=settings.GROQ_API_KEY)
         if settings.GEMINI_API_KEY:
-            google_generativeai_old.configure(api_key=settings.GEMINI_API_KEY)
             self.genai_client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     async def moderate_message(self, message: str) -> Dict[str, Any]:
