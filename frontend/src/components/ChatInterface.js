@@ -354,7 +354,6 @@ const ChatInterface = ({ room, classroom, user }) => {
                 {/* Message menu */}
                 {!msg.deleted && (canEditMessage(msg) || canDeleteMessage(msg)) && (
                   <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
-<<<<<<< HEAD
                     <button
                       onClick={() => setShowMessageMenu(showMessageMenu === (msg._id || msg.id) ? null : (msg._id || msg.id))}
                       className="p-1 bg-white rounded-full shadow-md hover:bg-gray-50"
@@ -378,8 +377,9 @@ const ChatInterface = ({ room, classroom, user }) => {
                             onClick={() => handleDeleteMessage(msg._id || msg.id)}
                             className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                           >
+                            <Trash2 className="h-4 w-4 mr-2" />
                             Delete
-                          </Button>
+                          </button>
                         )}
                       </div>
                     )}
