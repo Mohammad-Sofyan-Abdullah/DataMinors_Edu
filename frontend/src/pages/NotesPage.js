@@ -26,8 +26,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import Button from '../components/Button';
 
 const NotesPage = () => {
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('all');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState(null);
@@ -42,10 +42,9 @@ const NotesPage = () => {
 
   // Fetch documents
   const { data: documents = [], isLoading, refetch } = useQuery(
-    ['documents', searchQuery, selectedStatus],
+    ['documents', searchQuery],
     () => notesAPI.getDocuments({
-      search: searchQuery || undefined,
-      status: selectedStatus !== 'all' ? selectedStatus : undefined
+      search: searchQuery || undefined
     }).then(res => res.data),
     {
       onError: () => toast.error('Failed to load documents')
@@ -183,6 +182,12 @@ const NotesPage = () => {
     setDocumentToDelete(document);
   };
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setSearchQuery(searchInput);
+  };
+
+
   const confirmDelete = () => {
     if (documentToDelete) {
       deleteDocumentMutation.mutate(documentToDelete.id || documentToDelete._id);
@@ -245,31 +250,26 @@ const NotesPage = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Search and Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
-              placeholder="Search documents..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="input pl-10 w-full"
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-gray-400" />
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="input"
-            >
-              <option value="all">All Documents</option>
-              <option value="draft">Drafts</option>
-              <option value="published">Published</option>
-              <option value="archived">Archived</option>
-            </select>
-          </div>
+        {/* Search */}
+        <div className="mb-6">
+          <form onSubmit={handleSearch}>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <input
+                type="text"
+                placeholder="Search documents..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="input pl-10 pr-24 w-full"
+              />
+              <button
+                type="submit"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+              >
+                Search
+              </button>
+            </div>
+          </form>
         </div>
 
         {/* Unified Grid */}
