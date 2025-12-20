@@ -68,8 +68,16 @@ api.interceptors.response.use(
     }
 
     // Handle other errors
+    // Handle other errors
     if (error.response?.data?.detail) {
-      toast.error(error.response.data.detail);
+      const detail = error.response.data.detail;
+      if (typeof detail === 'string') {
+        toast.error(detail);
+      } else if (Array.isArray(detail)) {
+        toast.error(detail.map(d => d.msg || JSON.stringify(d)).join(', '));
+      } else {
+        toast.error(JSON.stringify(detail));
+      }
     } else if (error.message) {
       toast.error(error.message);
     } else {
@@ -134,8 +142,16 @@ longRunningApi.interceptors.response.use(
     }
 
     // Handle other errors
+    // Handle other errors
     if (error.response?.data?.detail) {
-      toast.error(error.response.data.detail);
+      const detail = error.response.data.detail;
+      if (typeof detail === 'string') {
+        toast.error(detail);
+      } else if (Array.isArray(detail)) {
+        toast.error(detail.map(d => d.msg || JSON.stringify(d)).join(', '));
+      } else {
+        toast.error(JSON.stringify(detail));
+      }
     } else if (error.message) {
       toast.error(error.message);
     } else {
@@ -189,7 +205,7 @@ export const classroomsAPI = {
 
 // Chat API
 export const chatAPI = {
-  getMessages: (roomId, limit = 50, offset = 0) => 
+  getMessages: (roomId, limit = 50, offset = 0) =>
     api.get(`/chat/rooms/${roomId}/messages`, { params: { limit, offset } }),
   sendMessage: (roomId, content) => api.post(`/chat/rooms/${roomId}/messages`, { content, room_id: roomId }),
   editMessage: (messageId, content) => api.put(`/chat/messages/${messageId}`, { content }),
@@ -220,21 +236,17 @@ export const youtubeAPI = {
 export const messagesAPI = {
   getConversations: () => api.get('/messages/conversations'),
   createOrGetConversation: (friendId) => api.post(`/messages/conversations/${friendId}`),
-  getMessages: (conversationId, limit = 50, offset = 0) => 
+  getMessages: (conversationId, limit = 50, offset = 0) =>
     api.get(`/messages/conversations/${conversationId}/messages`, { params: { limit, offset } }),
-  sendMessage: (conversationId, formData) => 
-    api.post(`/messages/conversations/${conversationId}/messages`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    }),
+  sendMessage: (conversationId, formData) =>
+    api.post(`/messages/conversations/${conversationId}/messages`, formData),
   deleteMessage: (messageId) => api.delete(`/messages/messages/${messageId}`),
 };
 
 // Marketplace API
 export const marketplaceAPI = {
   // Notes
-  createNote: (formData) => api.post('/marketplace/notes', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
+  createNote: (formData) => api.post('/marketplace/notes', formData),
   getNotes: (params) => api.get('/marketplace/notes', { params }),
   getNote: (noteId) => api.get(`/marketplace/notes/${noteId}`),
   getMyNotes: () => api.get('/marketplace/notes/user/my-notes'),
@@ -243,14 +255,14 @@ export const marketplaceAPI = {
   downloadNote: (noteId) => api.get(`/marketplace/notes/${noteId}/download`, {
     responseType: 'blob'
   }),
-  
+
   // Reviews
   getReviews: (noteId) => api.get(`/marketplace/notes/${noteId}/reviews`),
   createReview: (noteId, reviewData) => api.post(`/marketplace/notes/${noteId}/reviews`, reviewData),
-  
+
   // Wallet
   getWallet: () => api.get('/marketplace/wallet'),
-  
+
   // Leaderboard
   getLeaderboard: (limit = 10) => api.get('/marketplace/leaderboard', { params: { limit } }),
 };
@@ -262,9 +274,7 @@ export const notesAPI = {
   getDocument: (documentId) => api.get(`/notes/documents/${documentId}`),
   updateDocument: (documentId, documentData) => api.put(`/notes/documents/${documentId}`, documentData),
   deleteDocument: (documentId) => api.delete(`/notes/documents/${documentId}`),
-  uploadDocument: (formData) => api.post('/notes/documents/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
+  uploadDocument: (formData) => api.post('/notes/documents/upload', formData),
   chatWithDocument: (documentId, message) => api.post(`/notes/documents/${documentId}/chat`, { message }),
   generateNotes: (documentId, prompt) => api.post(`/notes/documents/${documentId}/generate-notes`, { prompt }),
   getChatHistory: (documentId) => api.get(`/notes/documents/${documentId}/chat-history`),

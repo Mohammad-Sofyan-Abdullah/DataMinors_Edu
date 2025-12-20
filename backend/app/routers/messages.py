@@ -199,7 +199,7 @@ async def get_messages(
 @router.post("/conversations/{conversation_id}/messages")
 async def send_message(
     conversation_id: str,
-    content: str = Form(...),
+    content: Optional[str] = Form(None),
     message_type: MessageType = Form(MessageType.TEXT),
     file: Optional[UploadFile] = File(None),
     current_user: UserInDB = Depends(get_current_active_user),
@@ -261,12 +261,22 @@ async def send_message(
                 else:
                     message_type = MessageType.FILE
 
+        # Validate: either content or file must be present
+        if not content and not file:
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Message must have content or a file"
+            )
+
         # Create message
+        # Ensure content is string for DB model
+        content_for_db = content or ""
+        
         message = DirectMessage(
             conversation_id=conversation_id,
             sender_id=user_id_str,
             receiver_id=receiver_id,
-            content=content,
+            content=content_for_db,
             message_type=message_type,
             file_url=file_url,
             file_name=file_name,
@@ -287,7 +297,7 @@ async def send_message(
             {
                 "$set": {
                     "last_message_id": message_id,
-                    "last_message_content": content[:100],  # Truncate for preview
+                    "last_message_content": (content if content else (f"Sent a {message_type.value}" if file else "Message"))[:100],
                     "last_message_timestamp": datetime.utcnow(),
                     "updated_at": datetime.utcnow()
                 }
@@ -296,7 +306,7 @@ async def send_message(
         
         # Check for AI mention
         ai_response_id = None
-        if "@AI" in content.upper():
+        if content and "@AI" in content.upper():
             try:
                 # Get recent conversation context
                 recent_messages = await db.direct_messages.find({

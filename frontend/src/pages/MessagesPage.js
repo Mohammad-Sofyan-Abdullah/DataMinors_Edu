@@ -28,18 +28,18 @@ import '../index.css';
 const MessagesPage = () => {
   const { friendId } = useParams();
   const navigate = useNavigate();
-  
+
   const [conversationId, setConversationId] = useState(null);
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  
+
   const emojis = ['😀', '😂', '😍', '🥰', '😎', '🤔', '👍', '👎', '❤️', '🔥', '💯', '🎉', '👏', '🙌', '🤝', '💪'];
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [smartReplies] = useState([]);
   const [friendInfo, setFriendInfo] = useState(null);
-  
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -88,12 +88,14 @@ const MessagesPage = () => {
       select: (response) => {
         console.log('Raw messages response:', response);
         const data = response.data;
-        
+
         // Filter out any error objects that might be in the response
         if (Array.isArray(data)) {
           const filteredData = data.filter(item => {
-            // Check if it's an error object
-            if (item && typeof item === 'object' && item.type && item.loc && item.msg) {
+            // Must have an ID
+            if (!item || (!item.id && !item._id)) return false;
+            // Filter out specific error patterns
+            if (item.type && item.loc && item.msg) {
               console.warn('Filtering out error object from messages:', item);
               return false;
             }
@@ -102,7 +104,7 @@ const MessagesPage = () => {
           console.log('Filtered messages:', filteredData);
           return filteredData;
         }
-        
+
         return data || [];
       },
       onError: (error) => {
@@ -125,13 +127,13 @@ const MessagesPage = () => {
       },
       onError: (error) => {
         console.error('Send message error:', error);
-        
+
         // Handle different error formats
         let errorMessage = 'Failed to send message';
-        
+
         if (error.response?.data) {
           const errorData = error.response.data;
-          
+
           // Handle FastAPI validation errors
           if (Array.isArray(errorData.detail)) {
             errorMessage = errorData.detail.map(err => {
@@ -148,7 +150,7 @@ const MessagesPage = () => {
         } else if (error.message) {
           errorMessage = error.message;
         }
-        
+
         toast.error(errorMessage);
       },
     }
@@ -161,7 +163,12 @@ const MessagesPage = () => {
       toast.success('Message deleted');
     },
     onError: (error) => {
-      toast.error(error.response?.data?.detail || 'Failed to delete message');
+      const errorMessage = error.response?.data?.detail
+        ? (typeof error.response.data.detail === 'string'
+          ? error.response.data.detail
+          : 'Failed to delete message')
+        : 'Failed to delete message';
+      toast.error(errorMessage);
     },
   });
 
@@ -175,16 +182,16 @@ const MessagesPage = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    
+
     if (!message.trim() && !selectedFile) return;
     if (!conversationId) return;
 
     const formData = new FormData();
     formData.append('content', message);
-    
+
     if (selectedFile) {
       formData.append('file', selectedFile);
-      
+
       // Set message type based on file type
       if (selectedFile.type.startsWith('image/')) {
         formData.append('message_type', 'image');
@@ -224,12 +231,12 @@ const MessagesPage = () => {
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           sampleRate: 44100
-        } 
+        }
       });
       mediaRecorderRef.current = new MediaRecorder(stream, {
         mimeType: 'audio/webm;codecs=opus'
@@ -243,12 +250,12 @@ const MessagesPage = () => {
       };
 
       mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { 
-          type: 'audio/webm;codecs=opus' 
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: 'audio/webm;codecs=opus'
         });
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const audioFile = new File([audioBlob], `voice_message_${timestamp}.webm`, { 
-          type: 'audio/webm' 
+        const audioFile = new File([audioBlob], `voice_message_${timestamp}.webm`, {
+          type: 'audio/webm'
         });
         setSelectedFile(audioFile);
         stream.getTracks().forEach(track => track.stop());
@@ -347,14 +354,13 @@ const MessagesPage = () => {
         transition={{ duration: 0.3 }}
         className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
       >
-        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-          isAI 
-            ? 'bg-purple-100 border border-purple-200' 
-            : isOwnMessage 
-              ? 'bg-blue-500 text-white' 
-              : 'bg-gray-200 text-gray-800'
-        }`}>
-          
+        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${isAI
+          ? 'bg-purple-100 border border-purple-200'
+          : isOwnMessage
+            ? 'bg-blue-500 text-white'
+            : 'bg-gray-200 text-gray-800'
+          }`}>
+
           {/* AI Badge */}
           {isAI && (
             <div className="flex items-center gap-1 mb-1">
@@ -367,30 +373,30 @@ const MessagesPage = () => {
           {msg.file_url && (
             <div className="mb-2">
               {msg.message_type === 'image' && (
-                <img 
+                <img
                   src={`http://localhost:8000${msg.file_url}`}
                   alt={safeText(msg.file_name)}
                   className="max-w-full h-auto rounded-lg cursor-pointer"
                   onClick={() => window.open(`http://localhost:8000${msg.file_url}`, '_blank')}
                 />
               )}
-              
+
               {msg.message_type === 'video' && (
-                <video 
-                  controls 
+                <video
+                  controls
                   className="max-w-full h-auto rounded-lg"
                   src={`http://localhost:8000${msg.file_url}`}
                 />
               )}
-              
+
               {msg.message_type === 'audio' && (
-                <audio 
-                  controls 
+                <audio
+                  controls
                   className="w-full"
                   src={`http://localhost:8000${msg.file_url}`}
                 />
               )}
-              
+
               {msg.message_type === 'file' && (
                 <div className="flex items-center gap-2 p-2 bg-white bg-opacity-20 rounded">
                   <FileText className="w-4 h-4" />
@@ -415,11 +421,10 @@ const MessagesPage = () => {
           )}
 
           {/* Message Info */}
-          <div className={`flex items-center justify-between mt-1 text-xs ${
-            isOwnMessage ? 'text-blue-100' : 'text-gray-500'
-          }`}>
+          <div className={`flex items-center justify-between mt-1 text-xs ${isOwnMessage ? 'text-blue-100' : 'text-gray-500'
+            }`}>
             <span>{formatTime(msg.timestamp)}</span>
-            
+
             <div className="flex items-center gap-1">
               {isOwnMessage && !isAI && (
                 <button
@@ -429,7 +434,7 @@ const MessagesPage = () => {
                   <Trash2 className="w-3 h-3" />
                 </button>
               )}
-              
+
               {isOwnMessage && (
                 msg.is_read ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />
               )}
@@ -455,7 +460,7 @@ const MessagesPage = () => {
       <div className="h-full bg-gray-50">
         <div className="max-w-4xl mx-auto p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">Messages</h1>
-          
+
           {friends.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-12 text-center">
               <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
@@ -474,7 +479,7 @@ const MessagesPage = () => {
                 const friendId = friend.id || friend._id;
                 const friendName = friend.name || friend.full_name || 'Friend';
                 const friendAvatar = friendName.charAt(0).toUpperCase();
-                
+
                 return (
                   <button
                     key={friendId}
@@ -518,7 +523,7 @@ const MessagesPage = () => {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          
+
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
               {safeText(friendInfo?.name || friendInfo?.full_name)?.charAt(0) || 'F'}
@@ -556,15 +561,13 @@ const MessagesPage = () => {
             }
 
             const validMessages = messages.filter(msg => {
-              // Comprehensive filtering
-              if (!msg) return false;
-              if (typeof msg !== 'object') return false;
+              // Ensure message is an object and has an ID
+              if (!msg || typeof msg !== 'object') return false;
               if (!msg.id && !msg._id) return false;
-              
+
               // Filter out error objects
               if (msg.type && msg.loc && msg.msg) return false;
-              if (msg.type && msg.loc && msg.msg && msg.input !== undefined) return false;
-              
+
               return true;
             });
 
@@ -669,9 +672,8 @@ const MessagesPage = () => {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={isRecording ? "Recording voice message..." : "Type a message... (use @AI for AI help)"}
-              className={` mt-2.5 w-full p-3 pr-12 border border-gray-300 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                isRecording ? 'bg-red-50 border-red-300' : ''
-              }`}
+              className={` mt-2.5 w-full p-3 pr-12 border border-gray-300 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isRecording ? 'bg-red-50 border-red-300' : ''
+                }`}
               rows={1}
               disabled={isRecording}
               onKeyPress={(e) => {
@@ -681,7 +683,7 @@ const MessagesPage = () => {
                 }
               }}
             />
-            
+
             {!isRecording && (
               <button
                 type="button"
@@ -710,11 +712,10 @@ const MessagesPage = () => {
             <button
               type="button"
               onClick={isRecording ? stopRecording : startRecording}
-              className={`p-3 rounded-full transition-all duration-200 ${
-                isRecording 
-                  ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse shadow-lg' 
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 hover:shadow-md'
-              }`}
+              className={`p-3 rounded-full transition-all duration-200 ${isRecording
+                ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse shadow-lg'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 hover:shadow-md'
+                }`}
               title={isRecording ? "Stop recording" : "Start voice recording"}
             >
               {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
