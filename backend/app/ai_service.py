@@ -1,13 +1,24 @@
 from groq import Groq
 from app.config import settings
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+import google.generativeai as google_generativeai_old
+from google import genai
+import io
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate, Image as ReportLabImage, PageBreak, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib.colors import HexColor
 
 logger = logging.getLogger(__name__)
 
 class AIService:
     def __init__(self):
         self.client = Groq(api_key=settings.GROQ_API_KEY)
+        if settings.GEMINI_API_KEY:
+            google_generativeai_old.configure(api_key=settings.GEMINI_API_KEY)
+            self.genai_client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     async def moderate_message(self, message: str) -> Dict[str, Any]:
         """Moderate a message for inappropriate content"""
@@ -539,6 +550,165 @@ RESPONSE GUIDELINES:
         except Exception as e:
             logger.error(f"Error in document chat: {e}")
             return f"I apologize, but I encountered an error: {str(e)}"
+
+    async def generate_slides_content(self, summary: str, count: int = 5) -> List[Dict[str, Any]]:
+        """Generate structured content for slides based on summary"""
+        try:
+            response = self.client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"""You are an expert visual designer and educator. Create {count} slide visual descriptions based on the provided video summary.
+                        
+                        The goal is to generate a PROMPT for an AI image generator (like Gemini/Imagen) to create a FULL PRESENTATION SLIDE image.
+                        The image itself should contain the text and the visual elements.
+                        
+                        For each slide, provide:
+                        1. A catchy Title (for internal reference)
+                        2. "image_prompt": A highly detailed prompt describing a presentation slide. 
+                           - Specify the background (e.g., solid dark, gradient, abstract tech).
+                           - Explicitly state the TEXT to appear on the slide (Title and max 3 short bullet points). 
+                           - Describe the layout (e.g., Title at top, text on left, illustrative diagram on right).
+                           - Use keywords like "high quality presentation slide", "modern UI", "infographic style", "4k", "clear text".
+                        
+                        Return ONLY a JSON array of objects:
+                        [
+                          {{
+                            "title": "Title for Ref",
+                            "image_prompt": "A modern presentation slide with a dark blue background. Title 'Introduction to AI' in bold white font at the top. Three bullet points: '1. Machine Learning basics', '2. Neural Networks', '3. Real-world apps'. On the right, a glowing brain circuit diagram. High resolution, professional design."
+                          }}
+                        ]"""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Summary:\n{summary}"
+                    }
+                ],
+                temperature=0.5,
+                response_format={"type": "json_object"}
+            )
+            
+            import json
+            content = response.choices[0].message.content
+            data = json.loads(content)
+            
+            if isinstance(data, dict) and "slides" in data:
+                return data["slides"]
+            if isinstance(data, list):
+                return data
+            # Fallback
+            for key in data:
+                if isinstance(data[key], list):
+                    return data[key]
+            
+            return []
+            
+        except Exception as e:
+            logger.error(f"Error generating slide content: {e}")
+            raise
+
+    async def generate_slide_image(self, prompt: str) -> bytes:
+        """Generate an image using Gemini (Imagen) based on prompt"""
+        try:
+            # Using the new google-genai SDK 
+            if not hasattr(self, 'genai_client'):
+                self.genai_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+            logger.info(f"Generating image with gemini-3-pro-image for prompt: {prompt[:30]}...")
+            
+            # Run synchronous generation in thread
+            import asyncio
+            response = await asyncio.to_thread(
+                self.genai_client.models.generate_content,
+                model="gemini-3-pro-image-preview",
+                contents=prompt
+            )
+            
+            # Extract image bytes from response
+            for part in response.parts:
+                if part.inline_data:
+                    # part.inline_data.data is bytes
+                    return part.inline_data.data
+            
+            logger.warning("No inline data (image) found in response.")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error generating slide image: {e}")
+            # Return None to allow process to continue without image
+            return None
+
+    async def create_slides_pdf(self, slides_data: List[Dict[str, Any]], output_path: str):
+        """Create a PDF presentation from slide data and generated images"""
+        try:
+            pw, ph = landscape(letter)
+            
+            # Define styles for fallback
+            styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'SlideTitle',
+                parent=styles['Title'],
+                fontSize=24,
+                spaceAfter=20,
+                alignment=1
+            )
+            
+            bullet_style = ParagraphStyle(
+                'SlideBullet',
+                parent=styles['Normal'],
+                fontSize=14,
+                leading=18,
+                spaceAfter=5,
+                leftIndent=20,
+                bulletIndent=10
+            )
+
+            story = []
+
+            for slide in slides_data:
+                # Add Image (Full Page)
+                if 'image_bytes' in slide and slide['image_bytes']:
+                    try:
+                        img_stream = io.BytesIO(slide['image_bytes'])
+                        
+                        # Add image fitting the page exactly
+                        img = ReportLabImage(img_stream, width=pw, height=ph)
+                        story.append(img)
+                        story.append(PageBreak())
+                        
+                    except Exception as img_error:
+                        logger.error(f"Failed to add image to PDF: {img_error}")
+                        # Fallback text if image missing
+                        story.append(Paragraph(f"Slide: {slide.get('title')}", title_style))
+                        story.append(Paragraph("[Image Generation Failed]", bullet_style))
+                        story.append(PageBreak())
+                else:
+                     # Fallback if no image bytes
+                    story.append(Paragraph(slide.get('title', 'Untitled Slide'), title_style))
+                    story.append(Paragraph("Image not available.", bullet_style))
+                    story.append(PageBreak())
+            
+            # Use BaseDocTemplate for full control over frames/margins
+            doc = BaseDocTemplate(output_path, pagesize=(pw, ph))
+            
+            # Create a full-page frame with no padding
+            full_frame = Frame(
+                x1=0, y1=0, width=pw, height=ph,
+                id='normal',
+                leftPadding=0, bottomPadding=0, rightPadding=0, topPadding=0,
+                showBoundary=0
+            )
+            
+            template = PageTemplate(id='normal', frames=[full_frame])
+            doc.addPageTemplates([template])
+            
+            doc.build(story)
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error creating slides PDF: {e}")
+            raise
 
 ai_service = AIService()
 

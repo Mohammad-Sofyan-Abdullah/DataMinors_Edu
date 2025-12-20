@@ -20,11 +20,29 @@ logger = logging.getLogger(__name__)
 class ExportService:
     def __init__(self):
         self.styles = getSampleStyleSheet()
+
+    def _strip_markdown(self, text: str) -> str:
+        """Strip markdown formatting from text"""
+        if not text:
+            return ""
+        import re
+        # Remove bold/italic ** or *
+        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+        text = re.sub(r'\*(.*?)\*', r'\1', text)
+        # Remove headers #
+        text = re.sub(r'#{1,6}\s?', '', text)
+        # Remove code blocks
+        text = re.sub(r'`{3}.*?`{3}', '', text, flags=re.DOTALL)
+        text = re.sub(r'`(.*?)`', r'\1', text)
+        # Remove links [text](url) -> text
+        text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)
+        return text.strip()
         
     def export_to_markdown(self, session_data: Dict[str, Any]) -> str:
         """Export session to Markdown format"""
         try:
             markdown_content = f"""# YouTube Video Summary
+---
 
 ## Video Information
 - **Title:** {session_data.get('video_title', 'Unknown')}
@@ -32,16 +50,26 @@ class ExportService:
 - **Duration:** {self._format_duration(session_data.get('video_duration', 0))}
 - **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
+---
+
 ## Short Summary
 {session_data.get('short_summary', 'No summary available')}
+
+---
 
 ## Detailed Summary
 {session_data.get('detailed_summary', 'No detailed summary available')}
 
+---
+
 ## Transcript
-```
+<details>
+<summary>Click to view transcript</summary>
+
 {session_data.get('transcript', 'No transcript available')}
-```
+</details>
+
+---
 
 ## Chat History
 """
@@ -53,9 +81,12 @@ class ExportService:
                     content = message.get('content', '')
                     timestamp = message.get('timestamp', '')
                     
-                    markdown_content += f"\n### {role} ({timestamp})\n{content}\n"
+                    if role.lower() == 'user':
+                        markdown_content += f"\n### 👤 You ({timestamp})\n{content}\n"
+                    else:
+                        markdown_content += f"\n### 🤖 Assistant ({timestamp})\n> {content.replace(chr(10), chr(10) + '> ')}\n"
             else:
-                markdown_content += "\nNo chat history available.\n"
+                markdown_content += "\n*No chat history available.*\n"
             
             return markdown_content
             
@@ -92,11 +123,11 @@ class ExportService:
             
             # Short Summary
             doc.add_heading('Short Summary', level=1)
-            doc.add_paragraph(session_data.get('short_summary', 'No summary available'))
+            doc.add_paragraph(self._strip_markdown(session_data.get('short_summary', 'No summary available')))
             
             # Detailed Summary
             doc.add_heading('Detailed Summary', level=1)
-            doc.add_paragraph(session_data.get('detailed_summary', 'No detailed summary available'))
+            doc.add_paragraph(self._strip_markdown(session_data.get('detailed_summary', 'No detailed summary available')))
             
             doc.add_page_break()
             
@@ -107,16 +138,26 @@ class ExportService:
             if chat_history:
                 for message in chat_history:
                     role = message.get('role', 'unknown').title()
-                    content = message.get('content', '')
+                    content = self._strip_markdown(message.get('content', ''))
                     timestamp = message.get('timestamp', '')
                     
-                    # Add role and timestamp
+                    # Create role paragraph with distinct styling
                     role_para = doc.add_paragraph()
                     role_run = role_para.add_run(f"{role} ({timestamp})")
                     role_run.bold = True
                     
+                    if role.lower() == 'assistant':
+                        role_run.font.color.rgb = docx.shared.RGBColor(0x25, 0x63, 0xEB)  # Blue for AI
+                    else:
+                        role_run.font.color.rgb = docx.shared.RGBColor(0x05, 0x96, 0x69)  # Green for User
+                    
                     # Add content
-                    doc.add_paragraph(content)
+                    content_para = doc.add_paragraph(content)
+                    
+                    # Indent AI responses slightly to create a threaded look
+                    if role.lower() == 'assistant':
+                        content_para.paragraph_format.left_indent = Inches(0.25)
+                        
                     doc.add_paragraph()  # Add space
             else:
                 doc.add_paragraph('No chat history available.')
@@ -202,27 +243,59 @@ class ExportService:
             
             # Short Summary
             content.append(Paragraph("Short Summary", heading_style))
-            content.append(Paragraph(session_data.get('short_summary', 'No summary available'), body_style))
+            content.append(Paragraph(self._strip_markdown(session_data.get('short_summary', 'No summary available')), body_style))
             content.append(Spacer(1, 20))
             
             # Detailed Summary
             content.append(Paragraph("Detailed Summary", heading_style))
-            content.append(Paragraph(session_data.get('detailed_summary', 'No detailed summary available'), body_style))
+            content.append(Paragraph(self._strip_markdown(session_data.get('detailed_summary', 'No detailed summary available')), body_style))
             content.append(PageBreak())
             
             # Chat History
             content.append(Paragraph("Chat History", heading_style))
             chat_history = session_data.get('chat_history', [])
             
+            user_style = ParagraphStyle(
+                'UserRole',
+                parent=self.styles['Normal'],
+                fontSize=11,
+                spaceBefore=10,
+                spaceAfter=2,
+                textColor=HexColor('#059669'), # Green
+                fontName='Helvetica-Bold'
+            )
+            
+            assistant_style = ParagraphStyle(
+                'AssistantRole',
+                parent=self.styles['Normal'],
+                fontSize=11,
+                spaceBefore=10,
+                spaceAfter=2,
+                textColor=HexColor('#2563eb'), # Blue
+                fontName='Helvetica-Bold'
+            )
+            
+            message_style = ParagraphStyle(
+                'MessageBody',
+                parent=self.styles['Normal'],
+                fontSize=10,
+                spaceAfter=8,
+                leading=14,
+                leftIndent=10
+            )
+            
             if chat_history:
                 for message in chat_history:
                     role = message.get('role', 'unknown').title()
-                    content_text = message.get('content', '')
+                    content_text = self._strip_markdown(message.get('content', ''))
                     timestamp = message.get('timestamp', '')
                     
-                    content.append(Paragraph(f"<b>{role}</b> ({timestamp})", chat_role_style))
-                    content.append(Paragraph(content_text, body_style))
-                    content.append(Spacer(1, 10))
+                    if role.lower() == 'user':
+                        content.append(Paragraph(f"👤 {role} ({timestamp})", user_style))
+                    else:
+                        content.append(Paragraph(f"🤖 {role} ({timestamp})", assistant_style))
+                        
+                    content.append(Paragraph(content_text, message_style))
             else:
                 content.append(Paragraph('No chat history available.', body_style))
             

@@ -30,6 +30,9 @@ class Settings:
     
     # Groq API
     GROQ_API_KEY: Optional[str] = get_env("GROQ_API_KEY")
+
+    # Gemini API
+    GEMINI_API_KEY: Optional[str] = get_env("GEMINI_API_KEY")
     
     # YouTube Service
     USE_TEST_YOUTUBE_SERVICE: bool = get_env("USE_TEST_YOUTUBE_SERVICE", "false").lower() == "true"
