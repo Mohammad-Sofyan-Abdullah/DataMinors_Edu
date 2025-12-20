@@ -1,7 +1,7 @@
 """
 YouTube Summarizer API Routes
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, BackgroundTasks
 from typing import List, Optional
 from datetime import datetime
 from app.models import (
@@ -14,9 +14,10 @@ from app.youtube_service import youtube_service
 from app.export_service import export_service
 from app.ai_service import ai_service
 from bson import ObjectId
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 import logging
 import io
+import os
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/youtube", tags=["youtube"])
@@ -567,6 +568,114 @@ async def explain_flashcard(
             detail=f"Failed to generate explanation: {str(e)}"
         )
 
+async def process_slide_generation(session_id: str, summary: str, count: int, db):
+    """Background task to generate slides"""
+    try:
+        session_object_id = ObjectId(session_id)
+        
+        # 1. Generate Content Plan
+        slides_content = await ai_service.generate_slides_content(summary, count)
+        
+        image_urls = []
+        output_dir = f"static/slides/{session_id}"
+        os.makedirs(output_dir, exist_ok=True)
+
+        # 2. Generate Images
+        for i, slide in enumerate(slides_content):
+            if "image_prompt" in slide:
+                try:
+                    # Run image generation in thread to prevent blocking
+                    import asyncio
+                    img_bytes = await ai_service.generate_slide_image(slide["image_prompt"])
+                    
+                    if img_bytes:
+                        slide["image_bytes"] = img_bytes
+                        # Save image to disk
+                        img_filename = f"slide_{i+1}.png"
+                        img_path = os.path.join(output_dir, img_filename)
+                        with open(img_path, "wb") as f:
+                            f.write(img_bytes)
+                        
+                        # Add to URLs (accessible via static mount)
+                        image_url = f"/static/slides/{session_id}/{img_filename}"
+                        image_urls.append(image_url)
+                        
+                except Exception as e:
+                    logger.error(f"Image generation failed for slide {slide.get('title')}: {e}")
+                    slide["image_bytes"] = None
+        
+        # 3. Create PDF
+        pdf_filename = f"slides_{session_id}.pdf"
+        pdf_path = os.path.join(output_dir, pdf_filename)
+        
+        await ai_service.create_slides_pdf(slides_content, pdf_path)
+        
+        pdf_url = f"/static/slides/{session_id}/{pdf_filename}"
+        
+        # Update session
+        await db.youtube_sessions.update_one(
+            {"_id": session_object_id},
+            {
+                "$set": {
+                    "slides_pdf_url": pdf_url,
+                    "generated_slide_images": image_urls,
+                    "slides_status": "completed"
+                }
+            }
+        )
+        logger.info(f"Slide generation completed for session {session_id}")
+        
+    except Exception as e:
+        logger.error(f"Error in background slide generation: {e}")
+        # Update status to failed
+        try:
+            await db.youtube_sessions.update_one(
+                {"_id": ObjectId(session_id)},
+                {"$set": {"slides_status": "failed"}}
+            )
+        except:
+            pass
+
+@router.post("/sessions/{session_id}/slides")
+async def generate_slides(
+    session_id: str,
+    background_tasks: BackgroundTasks,
+    count: int = Body(5, embed=True),
+    current_user: UserInDB = Depends(get_current_active_user),
+    db = Depends(get_database)
+):
+    """Generate visual slides for the video summary (Background Task)"""
+    try:
+        session_object_id = ObjectId(session_id)
+    except:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid session ID"
+        )
+    
+    session = await db.youtube_sessions.find_one({
+        "_id": session_object_id,
+        "user_id": current_user.id
+    })
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    summary = session.get("detailed_summary") or session.get("short_summary")
+    if not summary:
+        raise HTTPException(status_code=400, detail="No summary available")
+        
+    # Update status to processing
+    await db.youtube_sessions.update_one(
+        {"_id": session_object_id},
+        {"$set": {"slides_status": "processing"}}
+    )
+    
+    # Add to background tasks
+    background_tasks.add_task(process_slide_generation, session_id, summary, count, db)
+    
+    return {"status": "processing", "message": "Slide generation started in background"}
+
 @router.post("/sessions/{session_id}/related-videos")
 async def generate_related_videos(
     session_id: str,
@@ -645,4 +754,3 @@ async def generate_related_videos(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while generating related videos"
         )
-

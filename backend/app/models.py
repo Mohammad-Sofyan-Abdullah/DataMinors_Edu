@@ -229,6 +229,9 @@ class YouTubeSessionBase(BaseModel):
     detailed_summary: Optional[str] = None
     chat_history: List[YouTubeChatMessage] = []
     flashcards: Optional[List[Flashcard]] = []
+    slides_pdf_url: Optional[str] = None
+    slides_status: Optional[str] = "pending" # pending, processing, completed, failed
+    generated_slide_images: List[str] = [] # List of image URLs
 
 class YouTubeSessionCreate(YouTubeSessionBase):
     pass

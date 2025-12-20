@@ -23,5 +23,7 @@ torch
 torchaudio
 librosa
 PyPDF2
+google-generativeai
+python-pptx
 
 
