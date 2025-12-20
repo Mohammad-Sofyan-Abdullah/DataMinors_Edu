@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from 'react-query';
 // import { motion } from 'framer-motion'; // Removed unused import
-import { 
-  User, 
-  Mail, 
-  GraduationCap, 
-  Edit3, 
-  Save, 
+import {
+  User,
+  Mail,
+  GraduationCap,
+  Edit3,
+  Save,
   X,
   Camera,
   Plus,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
+import Button from '../components/Button';
 import toast from 'react-hot-toast';
 
 const ProfilePage = () => {
@@ -26,7 +27,7 @@ const ProfilePage = () => {
   const [newInterest, setNewInterest] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
-  
+
   const { user, updateProfile } = useAuth();
   const queryClient = useQueryClient();
 
@@ -40,7 +41,7 @@ const ProfilePage = () => {
       });
     }
   }, [user]);
-  
+
   // Cleanup preview URL when component unmounts or file changes
   React.useEffect(() => {
     return () => {
@@ -66,18 +67,18 @@ const ProfilePage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     let profileData = { ...formData };
-    
+
     // Handle file upload if there's a selected file
     if (selectedFile) {
       const base64 = await convertToBase64(selectedFile);
       profileData.avatar = base64;
     }
-    
+
     updateProfileMutation.mutate(profileData);
   };
-  
+
   const convertToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -86,7 +87,7 @@ const ProfilePage = () => {
       reader.onerror = (error) => reject(error);
     });
   };
-  
+
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -94,14 +95,14 @@ const ProfilePage = () => {
         toast.error('File size must be less than 5MB');
         return;
       }
-      
+
       if (!file.type.startsWith('image/')) {
         toast.error('Please select an image file');
         return;
       }
-      
+
       setSelectedFile(file);
-      
+
       // Create preview URL
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
@@ -164,13 +165,13 @@ const ProfilePage = () => {
             Manage your profile information and preferences
           </p>
         </div>
-        <button
+        <Button
           onClick={() => setIsEditing(!isEditing)}
-          className="btn-outline btn-md flex items-center"
+          variant="outline"
+          leftIcon={<Edit3 className="h-4 w-4" />}
         >
-          <Edit3 className="h-4 w-4 mr-2" />
           {isEditing ? 'Cancel' : 'Edit Profile'}
-        </button>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -208,12 +209,12 @@ const ProfilePage = () => {
                   </>
                 )}
               </div>
-              
+
               <h2 className="text-xl font-semibold text-gray-900 mb-1">
                 {user.name}
               </h2>
               <p className="text-sm text-gray-600 mb-4">{user.email}</p>
-              
+
               {user.student_id && (
                 <div className="flex items-center justify-center text-sm text-gray-500 mb-4">
                   <GraduationCap className="h-4 w-4 mr-1" />
@@ -321,13 +322,13 @@ const ProfilePage = () => {
                           className="input flex-1"
                           placeholder="Add a study interest"
                         />
-                        <button
+                        <Button
                           type="button"
                           onClick={addInterest}
-                          className="btn-primary btn-md"
+                          size="md"
+                          leftIcon={<Plus className="h-4 w-4" />}
                         >
-                          <Plus className="h-4 w-4" />
-                        </button>
+                        </Button>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {formData.study_interests.map((interest, index) => (
@@ -367,26 +368,22 @@ const ProfilePage = () => {
                 {/* Action buttons */}
                 {isEditing && (
                   <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                    <button
+                    <Button
                       type="button"
                       onClick={handleCancel}
-                      className="btn-outline btn-md"
+                      variant="outline"
+                      leftIcon={<X className="h-4 w-4" />}
                     >
-                      <X className="h-4 w-4 mr-2" />
                       Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="submit"
                       disabled={updateProfileMutation.isLoading}
-                      className="btn-primary btn-md flex items-center"
+                      isLoading={updateProfileMutation.isLoading}
+                      leftIcon={!updateProfileMutation.isLoading && <Save className="h-4 w-4" />}
                     >
-                      {updateProfileMutation.isLoading ? (
-                        <LoadingSpinner size="sm" />
-                      ) : (
-                        <Save className="h-4 w-4 mr-2" />
-                      )}
                       Save Changes
-                    </button>
+                    </Button>
                   </div>
                 )}
               </form>

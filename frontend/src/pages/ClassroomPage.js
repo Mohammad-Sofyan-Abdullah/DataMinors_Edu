@@ -3,11 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 // import { motion } from 'framer-motion'; // Removed unused import
 import toast from 'react-hot-toast';
-import { 
-  ArrowLeft, 
-  Users, 
-  Settings, 
-  Plus, 
+import {
+  ArrowLeft,
+  Users,
+  Settings,
+  Plus,
   MessageSquare,
   MoreVertical,
   Trash2,
@@ -25,6 +25,7 @@ import { useSocket } from '../contexts/SocketContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ChatInterface from '../components/ChatInterface';
 import CreateRoomModal from '../components/CreateRoomModal';
+import Button from '../components/Button';
 
 const ClassroomPage = () => {
   const { id } = useParams();
@@ -32,7 +33,7 @@ const ClassroomPage = () => {
   const { user } = useAuth();
   const { joinRoom, leaveRoom } = useSocket();
   const queryClient = useQueryClient();
-  
+
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
   const [showRoomMenu, setShowRoomMenu] = useState(null);
@@ -309,12 +310,12 @@ const ClassroomPage = () => {
         <p className="mt-1 text-sm text-gray-500">
           The classroom you're looking for doesn't exist or you don't have access to it.
         </p>
-        <button
+        <Button
           onClick={() => navigate('/dashboard')}
-          className="mt-4 btn-primary btn-md"
+          size="md"
         >
           Back to Dashboard
-        </button>
+        </Button>
       </div>
     );
   }
@@ -448,7 +449,7 @@ const ClassroomPage = () => {
               </button>
             </div>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto">
             {roomsLoading ? (
               <div className="p-4">
@@ -459,11 +460,10 @@ const ClassroomPage = () => {
                 {rooms.map((room) => (
                   <div
                     key={room.id || room._id}
-                    className={`relative group rounded-lg p-3 cursor-pointer transition-colors ${
-                      (selectedRoom?.id || selectedRoom?._id) === (room.id || room._id)
+                    className={`relative group rounded-lg p-3 cursor-pointer transition-colors ${(selectedRoom?.id || selectedRoom?._id) === (room.id || room._id)
                         ? 'bg-primary-100 text-primary-900'
                         : 'hover:bg-gray-50'
-                    }`}
+                      }`}
                     onClick={() => handleRoomSelect(room)}
                   >
                     <div className="flex items-center justify-between">
@@ -489,7 +489,7 @@ const ClassroomPage = () => {
                         </button>
                       )}
                     </div>
-                    
+
                     {room.description && (
                       <p className="text-xs text-gray-500 mt-1 truncate">
                         {room.description}
@@ -573,7 +573,7 @@ const ClassroomPage = () => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <div className="space-y-3">
               {availableFriends.length === 0 ? (
                 <p className="text-gray-500 text-center py-8">
@@ -591,7 +591,7 @@ const ClassroomPage = () => {
                       disabled={addMemberMutation.isLoading}
                       className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
-                      {addMemberMutation.isLoading ? 'Adding...' : 'Add'}
+                      Add
                     </button>
                   </div>
                 ))

@@ -29,6 +29,7 @@ import {
 import { messagesAPI, friendsAPI, youtubeAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import Button from '../components/Button';
 import '../index.css';
 
 const MessagesPage = () => {
@@ -61,7 +62,7 @@ const MessagesPage = () => {
         const friends = friendsResponse.data;
         const friend = friends.find(friend => (friend.id || friend._id) === friendId);
         if (friend) return friend;
-        
+
         // If not found in friends, get user info directly (for teachers)
         const userResponse = await messagesAPI.getUserInfo(friendId);
         return userResponse.data;
@@ -489,13 +490,14 @@ const MessagesPage = () => {
 
         {/* Import & Open Button for YouTube Sessions */}
         {contentType === 'youtube_session' && sharedContent.source_id && (
-          <button
+          <Button
             onClick={handleImportSession}
-            className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+            variant="danger" // Using danger since original was red, or define a new variant if needed, but danger usually maps to red
+            className="w-full mt-2 justify-center"
+            leftIcon={<Download className="w-4 h-4" />}
           >
-            <Download className="w-4 h-4" />
             Import & Open
-          </button>
+          </Button>
         )}
 
         {/* Source Link */}
@@ -610,12 +612,15 @@ const MessagesPage = () => {
                     <p className="text-sm font-medium truncate">{safeText(msg.file_name)}</p>
                     <p className="text-xs opacity-75">{formatFileSize(msg.file_size)}</p>
                   </div>
-                  <button
+                  <Button
                     onClick={() => window.open(`http://localhost:8000${msg.file_url}`, '_blank')}
-                    className="p-1 hover:bg-white hover:bg-opacity-20 rounded"
+                    variant="ghost"
+                    size="sm"
+                    className="p-1 h-auto"
+                    title="Download"
                   >
                     <Download className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -633,12 +638,14 @@ const MessagesPage = () => {
 
             <div className="flex items-center gap-1">
               {isOwnMessage && !isAI && (
-                <button
+                <Button
                   onClick={() => deleteMessageMutation.mutate(String(msg.id))}
-                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white hover:bg-opacity-20 rounded"
+                  variant="ghost"
+                  size="sm"
+                  className="opacity-0 group-hover:opacity-100 p-1 h-auto text-white hover:bg-white hover:bg-opacity-20"
                 >
                   <Trash2 className="w-3 h-3" />
-                </button>
+                </Button>
               )}
 
               {isOwnMessage && (
@@ -672,12 +679,12 @@ const MessagesPage = () => {
               <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No conversations yet</h3>
               <p className="text-gray-500">Add friends to start messaging them!</p>
-              <button
+              <Button
                 onClick={() => navigate('/friends')}
-                className="mt-4 btn-primary"
+                className="mt-4"
               >
                 Go to Friends
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="bg-white rounded-lg shadow divide-y divide-gray-200">
@@ -723,12 +730,13 @@ const MessagesPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
         <div className="flex items-center gap-3">
-          <button
+          <Button
             onClick={() => navigate('/friends')}
-            className="p-2 hover:bg-gray-100 rounded-full"
+            variant="ghost"
+            className="p-2 rounded-full h-auto"
           >
             <ArrowLeft className="w-5 h-5" />
-          </button>
+          </Button>
 
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
@@ -742,9 +750,9 @@ const MessagesPage = () => {
           </div>
         </div>
 
-        <button className="p-2 hover:bg-gray-100 rounded-full">
+        <Button variant="ghost" className="p-2 rounded-full h-auto">
           <MoreVertical className="w-5 h-5" />
-        </button>
+        </Button>
       </div>
 
       {/* Messages */}

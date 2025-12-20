@@ -16,13 +16,14 @@ import DashboardPage from './pages/DashboardPage';
 import ClassroomPage from './pages/ClassroomPage';
 import ProfilePage from './pages/ProfilePage';
 import FriendsPage from './pages/FriendsPage';
-import FriendRequestsPage from './pages/FriendRequestsPage';
+
 import MessagesPage from './pages/MessagesPage';
 import ConversationsListPage from './pages/ConversationsListPage';
 import YouTubeSummarizerLayout from './pages/YouTubeSummarizerLayout';
 import MarketplacePage from './pages/MarketplacePage';
 import NotesPage from './pages/NotesPage';
 import DocumentEditorPage from './pages/DocumentEditorPage';
+import DocumentSessionPage from './pages/DocumentSessionPage';
 import TeacherRegisterPage from './pages/TeacherRegisterPage';
 import TeacherProfileSetupPage from './pages/TeacherProfileSetupPage';
 import TeacherDashboardPage from './pages/TeacherDashboardPage';
@@ -54,8 +55,10 @@ function App() {
                 {/* Public routes */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+
+                {/* Protected routes */}
                 <Route path="/teacher/register" element={<TeacherRegisterPage />} />
-                
+
                 {/* Teacher Setup (Protected) */}
                 <Route path="/teacher/profile-setup" element={
                   <ProtectedRoute>
@@ -64,7 +67,7 @@ function App() {
                     </RoleProtectedRoute>
                   </ProtectedRoute>
                 } />
-                
+
                 {/* Teacher Routes with Teacher Layout */}
                 <Route path="/teacher" element={
                   <ProtectedRoute>
@@ -82,7 +85,7 @@ function App() {
                   <Route path="earnings" element={<TeacherDashboardPage />} />
                   <Route path="reviews" element={<TeacherReviewsPage />} />
                 </Route>
-                
+
                 {/* Student Routes with Student Layout */}
                 <Route path="/" element={
                   <ProtectedRoute>
@@ -95,26 +98,26 @@ function App() {
                   <Route path="dashboard" element={<DashboardPage />} />
                   <Route path="notes" element={<NotesPage />} />
                   <Route path="notes/:documentId" element={<DocumentEditorPage />} />
+                  <Route path="notes/session/:sessionId" element={<DocumentSessionPage />} />
                   <Route path="marketplace" element={<MarketplacePage />} />
                   <Route path="classroom/:id" element={<ClassroomPage />} />
                   <Route path="youtube-summarizer" element={<YouTubeSummarizerLayout />} />
                   <Route path="profile" element={<ProfilePage />} />
-                  <Route path="friends" element={<FriendsPage />} />
-                  <Route path="friend-requests" element={<FriendRequestsPage />} />
+                  <Route path="/friends" element={<FriendsPage />} />
                   <Route path="messages" element={<ConversationsListPage />} />
                   <Route path="messages/:friendId" element={<MessagesPage />} />
-                  
+
                   {/* Teacher Discovery - accessible to students */}
                   <Route path="teachers" element={<TeachersDiscoveryPage />} />
                   <Route path="teachers/:teacherId" element={<TeacherProfileViewPage />} />
                   <Route path="my-hire-requests" element={<MyHireRequestsPage />} />
                   <Route path="my-sessions" element={<StudentSessionsPage />} />
                 </Route>
-                
+
                 {/* Catch all route */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
-              
+
               {/* Toast notifications */}
               <Toaster
                 position="top-right"

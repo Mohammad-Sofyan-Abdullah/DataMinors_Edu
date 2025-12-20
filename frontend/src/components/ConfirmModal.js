@@ -1,4 +1,5 @@
 import React from 'react';
+import Button from './Button';
 
 const ConfirmModal = ({ open, title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm, onCancel, loading = false }) => {
   if (!open) return null;
@@ -10,20 +11,21 @@ const ConfirmModal = ({ open, title, message, confirmLabel = 'Confirm', cancelLa
         <p className="mt-2 text-sm text-gray-600">{message}</p>
 
         <div className="mt-4 flex justify-end space-x-2">
-          <button
+          <Button
             onClick={onCancel}
-            className="btn-outline btn-sm"
+            variant="outline"
+            size="sm"
             disabled={loading}
           >
             {cancelLabel}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onConfirm}
-            className="btn-primary btn-sm flex items-center"
-            disabled={loading}
+            size="sm"
+            isLoading={loading}
           >
-            {loading ? 'Processing...' : confirmLabel}
-          </button>
+            {confirmLabel}
+          </Button>
         </div>
       </div>
     </div>
