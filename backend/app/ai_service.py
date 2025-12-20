@@ -886,5 +886,276 @@ Generate educational video suggestions that would complement this content and he
             logger.error(f"Error creating slides PDF: {e}")
             raise
 
+    async def generate_document_summaries(self, content: str, document_title: str) -> tuple:
+        """Generate short and detailed summaries from document content"""
+        try:
+            logger.info(f"Generating summaries for document: {document_title}")
+            
+            # Truncate content if too long
+            if len(content) > 25000:
+                content = content[:25000] + "...(truncated)"
+            
+            response = self.client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are an expert document summarizer for educational content. Generate two summaries from the provided document.
+
+OUTPUT FORMAT (JSON only):
+{
+  "short_summary": "A concise 2-3 paragraph overview of the document's main points",
+  "detailed_summary": "A comprehensive summary covering all key concepts, definitions, processes, and important details from the document. Use bullet points and organize by topics."
+}
+
+GUIDELINES:
+- For short summary: Focus on the main thesis, key takeaways, and core message
+- For detailed summary: Include all important concepts, definitions, examples, and supporting details
+- Use clear, educational language
+- Organize content logically
+- Highlight key terms and concepts"""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""Document Title: {document_title}
+
+Document Content:
+{content}
+
+Generate comprehensive summaries for this document. Return only valid JSON."""
+                    }
+                ],
+                temperature=0.3,
+                max_tokens=3000,
+                response_format={"type": "json_object"}
+            )
+            
+            import json
+            result = response.choices[0].message.content.strip()
+            
+            # Clean up response if needed
+            if result.startswith("```json"):
+                result = result.replace("```json", "").replace("```", "").strip()
+            
+            data = json.loads(result)
+            
+            short_summary = data.get("short_summary", "")
+            detailed_summary = data.get("detailed_summary", "")
+            
+            if not short_summary or not detailed_summary:
+                raise ValueError("Failed to generate summaries")
+            
+            logger.info(f"Successfully generated summaries for document: {document_title}")
+            return short_summary, detailed_summary
+            
+        except Exception as e:
+            logger.error(f"Error generating document summaries: {e}")
+            raise ValueError(f"Document summarization failed: {str(e)}")
+
+    async def generate_document_flashcards(self, content: str, document_title: str, count: int = 15) -> list:
+        """Generate knowledge-testing flashcards from document content"""
+        try:
+            logger.info(f"Generating flashcards for document: {document_title}")
+            
+            # Truncate content if too long
+            if len(content) > 20000:
+                content = content[:20000] + "...(truncated)"
+            
+            word_count = len(content.split())
+            suggested_count = min(25, max(5, word_count // 150))
+            
+            response = self.client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are an expert educational content creator. Create knowledge-testing flashcards from document content.
+
+FLASHCARD TYPES:
+1. Definition questions: "What is [concept]?" or "Define [term]"
+2. Process questions: "How does [process] work?" or "Explain the steps of [method]"
+3. Application questions: "When would you use [technique]?" or "What are the benefits of [approach]?"
+4. Comparison questions: "What's the difference between [A] and [B]?"
+5. Technical details: "What are the key components of [system]?"
+
+REQUIREMENTS:
+- Create specific questions based on the document content
+- Focus on important concepts, definitions, and processes
+- Make questions testable and educational
+- Generate 8-20 flashcards depending on content
+- Each flashcard needs: question, answer, explanation
+
+OUTPUT FORMAT (JSON only):
+{
+  "flashcards": [
+    {
+      "question": "What is the main concept discussed?",
+      "answer": "Clear, concise answer based on document content.",
+      "explanation": "Additional context and details to help understand the concept."
+    }
+  ]
+}"""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""Document: {document_title}
+
+Content:
+{content}
+
+Create educational flashcards based on the concepts in this document. Focus on specific, testable knowledge. Return only valid JSON."""
+                    }
+                ],
+                temperature=0.3,
+                max_tokens=3000,
+                response_format={"type": "json_object"}
+            )
+            
+            import json
+            result = response.choices[0].message.content.strip()
+            
+            if result.startswith("```json"):
+                result = result.replace("```json", "").replace("```", "").strip()
+            
+            data = json.loads(result)
+            
+            flashcards = []
+            if isinstance(data, dict) and "flashcards" in data:
+                flashcards = data["flashcards"]
+            elif isinstance(data, list):
+                flashcards = data
+            
+            valid_flashcards = []
+            for card in flashcards:
+                if isinstance(card, dict):
+                    question = card.get("question", "").strip()
+                    answer = card.get("answer", "").strip()
+                    explanation = card.get("explanation", "Review the document for more details.").strip()
+                    
+                    if question and answer:
+                        valid_flashcards.append({
+                            "question": question,
+                            "answer": answer,
+                            "explanation": explanation
+                        })
+            
+            if len(valid_flashcards) >= 1:
+                logger.info(f"Successfully generated {len(valid_flashcards)} flashcards for document")
+                return valid_flashcards
+            else:
+                raise ValueError("Failed to generate any valid flashcards")
+                
+        except Exception as e:
+            logger.error(f"Error generating document flashcards: {e}")
+            raise ValueError(f"Document flashcard generation failed: {str(e)}")
+
+    async def generate_document_quiz(self, content: str, document_title: str, count: int = 10) -> dict:
+        """Generate a multiple-choice quiz from document content"""
+        try:
+            logger.info(f"Generating quiz for document: {document_title}")
+            
+            # Truncate content if too long
+            if len(content) > 20000:
+                content = content[:20000] + "...(truncated)"
+            
+            word_count = len(content.split())
+            suggested_count = min(15, max(5, word_count // 200))
+            actual_count = min(count, suggested_count) if count else suggested_count
+            
+            response = self.client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"""You are an expert educational assessment creator. Create a multiple-choice quiz with {actual_count} questions from the document content.
+
+QUIZ REQUIREMENTS:
+- Each question should test understanding of key concepts
+- Provide 4 answer options (A, B, C, D) for each question
+- Only ONE correct answer per question
+- Include plausible distractors (wrong answers that seem reasonable)
+- Cover different topics and difficulty levels
+- Include explanation for why the correct answer is right
+
+QUESTION TYPES:
+1. Knowledge/Recall: "What is..." / "Which of the following..."
+2. Comprehension: "What does X mean in the context of..."
+3. Application: "In what situation would you use..."
+4. Analysis: "What is the relationship between X and Y?"
+
+OUTPUT FORMAT (JSON only):
+{{
+  "questions": [
+    {{
+      "question": "What is the primary purpose of X?",
+      "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
+      "correct_answer": 0,
+      "explanation": "Option A is correct because... The other options are incorrect because..."
+    }}
+  ]
+}}
+
+NOTE: correct_answer is the index (0-3) of the correct option."""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""Document: {document_title}
+
+Content:
+{content}
+
+Create a comprehensive multiple-choice quiz to test understanding of this document. Return only valid JSON."""
+                    }
+                ],
+                temperature=0.4,
+                max_tokens=4000,
+                response_format={"type": "json_object"}
+            )
+            
+            import json
+            result = response.choices[0].message.content.strip()
+            
+            if result.startswith("```json"):
+                result = result.replace("```json", "").replace("```", "").strip()
+            
+            data = json.loads(result)
+            
+            questions = []
+            if isinstance(data, dict) and "questions" in data:
+                questions = data["questions"]
+            elif isinstance(data, list):
+                questions = data
+            
+            valid_questions = []
+            for q in questions:
+                if isinstance(q, dict):
+                    question_text = q.get("question", "").strip()
+                    options = q.get("options", [])
+                    correct_answer = q.get("correct_answer", 0)
+                    explanation = q.get("explanation", "").strip()
+                    
+                    # Validate question structure
+                    if question_text and len(options) == 4 and isinstance(correct_answer, int) and 0 <= correct_answer <= 3:
+                        valid_questions.append({
+                            "question": question_text,
+                            "options": options,
+                            "correct_answer": correct_answer,
+                            "explanation": explanation or "Review the document for more details about this concept."
+                        })
+            
+            if len(valid_questions) >= 1:
+                logger.info(f"Successfully generated {len(valid_questions)} quiz questions for document")
+                return {
+                    "questions": valid_questions,
+                    "generated_at": None  # Will be set by the calling function
+                }
+            else:
+                raise ValueError("Failed to generate any valid quiz questions")
+                
+        except Exception as e:
+            logger.error(f"Error generating document quiz: {e}")
+            raise ValueError(f"Document quiz generation failed: {str(e)}")
+
+
 ai_service = AIService()
 

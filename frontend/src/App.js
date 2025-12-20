@@ -20,6 +20,7 @@ import YouTubeSummarizerLayout from './pages/YouTubeSummarizerLayout';
 import MarketplacePage from './pages/MarketplacePage';
 import NotesPage from './pages/NotesPage';
 import DocumentEditorPage from './pages/DocumentEditorPage';
+import DocumentSessionPage from './pages/DocumentSessionPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -42,7 +43,7 @@ function App() {
                 {/* Public routes */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
-                
+
                 {/* Protected routes */}
                 <Route path="/" element={
                   <ProtectedRoute>
@@ -53,6 +54,7 @@ function App() {
                   <Route path="dashboard" element={<DashboardPage />} />
                   <Route path="notes" element={<NotesPage />} />
                   <Route path="notes/:documentId" element={<DocumentEditorPage />} />
+                  <Route path="notes/session/:sessionId" element={<DocumentSessionPage />} />
                   <Route path="marketplace" element={<MarketplacePage />} />
                   <Route path="classroom/:id" element={<ClassroomPage />} />
                   <Route path="youtube-summarizer" element={<YouTubeSummarizerLayout />} />
@@ -62,11 +64,11 @@ function App() {
                   <Route path="messages" element={<MessagesPage />} />
                   <Route path="messages/:friendId" element={<MessagesPage />} />
                 </Route>
-                
+
                 {/* Catch all route */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
-              
+
               {/* Toast notifications */}
               <Toaster
                 position="top-right"

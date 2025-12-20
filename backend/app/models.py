@@ -331,6 +331,12 @@ class SharedContentType(str, Enum):
     SLIDES = "slides"
     AI_CHAT = "ai_chat"
     NOTES = "notes"
+    # Document Summarizer types
+    DOCUMENT_SUMMARY = "document_summary"
+    DOCUMENT_SESSION = "document_session"  # Full document session that can be imported
+    DOCUMENT_FLASHCARDS = "document_flashcards"
+    DOCUMENT_SLIDES = "document_slides"
+    DOCUMENT_QUIZ = "document_quiz"
 
 class SharedContentData(BaseModel):
     content_type: SharedContentType
@@ -546,6 +552,75 @@ class DocumentChatMessage(BaseModel):
     message: str
     response: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+        populate_by_name = True
+
+
+# Document Session Models (similar to YouTube Session)
+class DocumentSessionChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+class QuizQuestion(BaseModel):
+    question: str
+    options: List[str]  # Multiple choice options (4 options)
+    correct_answer: int  # Index of correct option (0-3)
+    explanation: Optional[str] = None
+
+
+class Quiz(BaseModel):
+    questions: List[QuizQuestion]
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DocumentSessionBase(BaseModel):
+    document_id: PyObjectId
+    document_title: str
+    document_content: str = ""
+    short_summary: Optional[str] = None
+    detailed_summary: Optional[str] = None
+    chat_history: List[DocumentSessionChatMessage] = []
+    flashcards: Optional[List[Flashcard]] = []
+    quiz: Optional[Quiz] = None
+    slides_pdf_url: Optional[str] = None
+    slides_status: Optional[str] = "pending"  # pending, processing, completed, failed
+    generated_slide_images: List[str] = []  # List of image URLs
+
+
+class DocumentSessionCreate(BaseModel):
+    document_id: str
+
+
+class DocumentSessionUpdate(BaseModel):
+    short_summary: Optional[str] = None
+    detailed_summary: Optional[str] = None
+    chat_history: Optional[List[DocumentSessionChatMessage]] = None
+
+
+class DocumentSessionInDB(DocumentSessionBase):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+        populate_by_name = True
+
+
+class DocumentSession(DocumentSessionBase):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:
         allow_population_by_field_name = True

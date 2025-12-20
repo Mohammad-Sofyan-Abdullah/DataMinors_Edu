@@ -295,6 +295,7 @@ export const marketplaceAPI = {
 
 // Notes API
 export const notesAPI = {
+  // Document management
   getDocuments: (params = {}) => api.get('/notes/documents', { params }),
   createDocument: (documentData) => api.post('/notes/documents', documentData),
   getDocument: (documentId) => api.get(`/notes/documents/${documentId}`),
@@ -304,8 +305,26 @@ export const notesAPI = {
   chatWithDocument: (documentId, message) => api.post(`/notes/documents/${documentId}/chat`, { message }),
   generateNotes: (documentId, prompt) => api.post(`/notes/documents/${documentId}/generate-notes`, { prompt }),
   getChatHistory: (documentId) => api.get(`/notes/documents/${documentId}/chat-history`),
+
+  // Document Session management
+  createSession: (documentId) => api.post('/notes/sessions', { document_id: documentId }),
+  getSessions: () => api.get('/notes/sessions'),
+  getSession: (sessionId) => api.get(`/notes/sessions/${sessionId}`),
+  deleteSession: (sessionId) => api.delete(`/notes/sessions/${sessionId}`),
+
+  // Session AI features
+  summarizeSession: (sessionId) => longRunningApi.post(`/notes/sessions/${sessionId}/summarize`),
+  chatWithSession: (sessionId, message) => api.post(`/notes/sessions/${sessionId}/chat`, { message }),
+  clearSessionChat: (sessionId) => api.post(`/notes/sessions/${sessionId}/chat/clear`),
+  generateFlashcards: (sessionId, count = 15) => api.post(`/notes/sessions/${sessionId}/flashcards`, { count }),
+  explainFlashcard: (sessionId, question, answer) => api.post(`/notes/sessions/${sessionId}/flashcards/explain`, { question, answer }),
+  generateQuiz: (sessionId, count = 10) => api.post(`/notes/sessions/${sessionId}/quiz`, { count }),
+  generateSlides: (sessionId, count = 5) => api.post(`/notes/sessions/${sessionId}/slides`, { count }),
+  regenerateSummaries: (sessionId) => longRunningApi.post(`/notes/sessions/${sessionId}/regenerate-summaries`),
+
+  // Session import
+  importSession: (sessionId) => api.post(`/notes/sessions/${sessionId}/import`),
 };
 
 export default api;
-
 

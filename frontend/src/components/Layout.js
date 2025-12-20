@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from 'react-query';
-import { 
-  Home, 
-  Users, 
-  User, 
-  LogOut, 
-  Menu, 
+import {
+  Home,
+  Users,
+  User,
+  LogOut,
+  Menu,
   X,
   MessageSquare,
   BookOpen,
@@ -27,6 +27,7 @@ const Layout = () => {
   const { connected } = useSocket();
   const navigate = useNavigate();
   const location = useLocation();
+  const isImmersive = location.pathname.includes('/notes/session') || location.pathname === '/youtube-summarizer';
 
   // Fetch friend requests count
   const { data: friendRequests = [] } = useQuery(
@@ -86,7 +87,7 @@ const Layout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`bg-gray-50 ${isImmersive ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       {/* Mobile sidebar */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -129,11 +130,10 @@ const Layout = () => {
                           navigate(item.href);
                           setSidebarOpen(false);
                         }}
-                        className={`${
-                          isActive(item.href)
-                            ? 'bg-primary-100 text-primary-900'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                        } group flex w-full items-center rounded-md px-2 py-2 text-base font-medium relative`}
+                        className={`${isActive(item.href)
+                          ? 'bg-primary-100 text-primary-900'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          } group flex w-full items-center rounded-md px-2 py-2 text-base font-medium relative`}
                       >
                         <Icon className="mr-4 h-6 w-6 flex-shrink-0" />
                         {item.name}
@@ -169,11 +169,10 @@ const Layout = () => {
                   <button
                     key={item.name}
                     onClick={() => navigate(item.href)}
-                    className={`${
-                      isActive(item.href)
-                        ? 'bg-primary-100 text-primary-900'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    } group flex w-full items-center rounded-md px-2 py-2 text-sm font-medium relative`}
+                    className={`${isActive(item.href)
+                      ? 'bg-primary-100 text-primary-900'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      } group flex w-full items-center rounded-md px-2 py-2 text-sm font-medium relative`}
                   >
                     <Icon className="mr-3 h-6 w-6 flex-shrink-0" />
                     {item.name}
@@ -205,7 +204,7 @@ const Layout = () => {
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-64 flex flex-col flex-1">
+      <div className={`lg:pl-64 flex flex-col ${isImmersive ? 'h-full overflow-hidden' : 'flex-1 min-h-screen'}`}>
         {/* Top navigation */}
         <div className="sticky top-0 z-10 flex h-16 flex-shrink-0 bg-white shadow">
           <button
@@ -236,7 +235,7 @@ const Layout = () => {
                       {connected ? 'Connected' : 'Disconnected'}
                     </span>
                   </div>
-                  
+
                   {/* Logout button */}
                   <button
                     onClick={handleLogout}
@@ -252,9 +251,9 @@ const Layout = () => {
         </div>
 
         {/* Page content */}
-        <main className="flex-1">
-          <div className="py-6">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <main className={`flex-1 flex flex-col ${location.pathname.includes('/notes/session') || location.pathname === '/youtube-summarizer' ? 'overflow-hidden' : ''}`}>
+          <div className={location.pathname.includes('/notes/session') || location.pathname === '/youtube-summarizer' ? "flex-1 flex flex-col h-full min-h-0" : "py-6"}>
+            <div className={location.pathname.includes('/notes/session') || location.pathname === '/youtube-summarizer' ? "flex-1 h-full min-h-0 relative" : "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"}>
               <Outlet />
             </div>
           </div>
