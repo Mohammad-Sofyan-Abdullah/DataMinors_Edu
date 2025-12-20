@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Send, 
-  MoreVertical, 
-  Edit3, 
-  Trash2, 
+import {
+  Send,
+  MoreVertical,
+  Edit3,
+  Trash2,
   FileText,
   Sparkles,
   Loader2
@@ -16,6 +16,7 @@ import { useSocket } from '../contexts/SocketContext';
 // import { useAuth } from '../contexts/AuthContext'; // Removed unused import
 import LoadingSpinner from './LoadingSpinner';
 import toast from 'react-hot-toast';
+import Button from './Button';
 
 const ChatInterface = ({ room, classroom, user }) => {
   const [message, setMessage] = useState('');
@@ -26,7 +27,7 @@ const ChatInterface = ({ room, classroom, user }) => {
   const [showSummary, setShowSummary] = useState(false);
   const [summary, setSummary] = useState('');
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
-  
+
   const messagesEndRef = useRef(null);
   const queryClient = useQueryClient();
   const { socket, connected } = useSocket();
@@ -108,16 +109,16 @@ const ChatInterface = ({ room, classroom, user }) => {
     };
 
     const handleMessageEdited = (data) => {
-      setMessages(prev => 
-        prev.map(msg => 
+      setMessages(prev =>
+        prev.map(msg =>
           msg.id === data.data.message.id ? data.data.message : msg
         )
       );
     };
 
     const handleMessageDeleted = (data) => {
-      setMessages(prev => 
-        prev.map(msg => 
+      setMessages(prev =>
+        prev.map(msg =>
           msg.id === data.data.message_id ? { ...msg, deleted: true } : msg
         )
       );
@@ -209,18 +210,16 @@ const ChatInterface = ({ room, classroom, user }) => {
           )}
         </div>
         <div className="flex items-center space-x-2">
-          <button
+          <Button
             onClick={handleGenerateSummary}
             disabled={isLoadingSummary}
-            className="btn-outline btn-sm flex items-center"
+            variant="outline"
+            size="sm"
+            isLoading={isLoadingSummary}
+            leftIcon={!isLoadingSummary && <Sparkles className="h-4 w-4" />}
           >
-            {isLoadingSummary ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4 mr-2" />
-            )}
             Summarize
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -253,31 +252,34 @@ const ChatInterface = ({ room, classroom, user }) => {
                       autoFocus
                     />
                     <div className="flex justify-end space-x-2 mt-2">
-                      <button
+                      <Button
                         onClick={() => {
                           setEditingMessage(null);
                           setEditContent('');
                         }}
-                        className="text-xs text-gray-500 hover:text-gray-700"
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-gray-500 hover:text-gray-700 h-auto py-1 px-2"
                       >
                         Cancel
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={handleSaveEdit}
                         disabled={!editContent.trim() || editMessageMutation.isLoading}
-                        className="text-xs text-primary-600 hover:text-primary-700"
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-primary-600 hover:text-primary-700 h-auto py-1 px-2"
                       >
                         Save
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
                   <div
-                    className={`rounded-lg p-3 ${
-                      msg.sender_id === user?.id
+                    className={`rounded-lg p-3 ${msg.sender_id === user?.id
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-100 text-gray-900'
-                    }`}
+                      }`}
                   >
                     {msg.deleted ? (
                       <p className="text-sm italic">This message was deleted</p>
@@ -300,32 +302,35 @@ const ChatInterface = ({ room, classroom, user }) => {
                 {/* Message menu */}
                 {!msg.deleted && (canEditMessage(msg) || canDeleteMessage(msg)) && (
                   <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
+                    <Button
                       onClick={() => setShowMessageMenu(showMessageMenu === msg.id ? null : msg.id)}
-                      className="p-1 bg-white rounded-full shadow-md hover:bg-gray-50"
+                      variant="ghost"
+                      className="p-1 bg-white rounded-full shadow-md hover:bg-gray-50 h-auto"
                     >
                       <MoreVertical className="h-4 w-4 text-gray-600" />
-                    </button>
-                    
+                    </Button>
+
                     {showMessageMenu === msg.id && (
                       <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-md shadow-lg border border-gray-200 z-10">
                         {canEditMessage(msg) && (
-                          <button
+                          <Button
                             onClick={() => handleEditMessage(msg)}
-                            className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            variant="ghost"
+                            className="w-full justify-start px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 h-auto rounded-none"
+                            leftIcon={<Edit3 className="h-4 w-4" />}
                           >
-                            <Edit3 className="h-4 w-4 mr-2" />
                             Edit
-                          </button>
+                          </Button>
                         )}
                         {canDeleteMessage(msg) && (
-                          <button
+                          <Button
                             onClick={() => handleDeleteMessage(msg.id)}
-                            className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                            variant="ghost"
+                            className="w-full justify-start px-3 py-2 text-sm text-red-600 hover:bg-red-50 h-auto rounded-none"
+                            leftIcon={<Trash2 className="h-4 w-4" />}
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
                             Delete
-                          </button>
+                          </Button>
                         )}
                       </div>
                     )}
@@ -349,17 +354,14 @@ const ChatInterface = ({ room, classroom, user }) => {
             disabled={!connected}
             className="input flex-1"
           />
-          <button
+          <Button
             type="submit"
             disabled={!message.trim() || !connected || sendMessageMutation.isLoading}
-            className="btn-primary btn-md"
+            isLoading={sendMessageMutation.isLoading}
+            size="md"
           >
-            {sendMessageMutation.isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </button>
+            <Send className="h-4 w-4" />
+          </Button>
         </form>
       </div>
 
@@ -378,12 +380,13 @@ const ChatInterface = ({ room, classroom, user }) => {
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-medium text-gray-900">Chat Summary</h3>
-                    <button
+                    <Button
                       onClick={() => setShowSummary(false)}
-                      className="text-gray-400 hover:text-gray-600"
+                      variant="ghost"
+                      className="text-gray-400 hover:text-gray-600 h-auto p-1"
                     >
                       ×
-                    </button>
+                    </Button>
                   </div>
                   <div className="max-h-96 overflow-y-auto">
                     {isLoadingSummary ? (

@@ -5,6 +5,7 @@ import { Eye, EyeOff, Mail, Lock, User, BookOpen, ArrowRight, GraduationCap } fr
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
+import Button from '../components/Button';
 
 const RegisterPage = () => {
   const [step, setStep] = useState(1); // 1: Email, 2: Verification, 3: Profile
@@ -22,7 +23,7 @@ const RegisterPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [studyInterest, setStudyInterest] = useState('');
-  
+
   const { register, verifyEmail, isAuthenticated, error, clearError } = useAuth();
   const navigate = useNavigate();
 
@@ -63,35 +64,35 @@ const RegisterPage = () => {
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     // Prepare registration data
     const registrationData = {
       email: formData.email,
       password: formData.password,
       name: formData.name,
     };
-    
+
     // Only include student_id if it's not empty
     if (formData.student_id && formData.student_id.trim() !== '') {
       registrationData.student_id = formData.student_id.trim();
     }
-    
+
     const result = await register(registrationData);
-    
+
     if (result.success) {
       setStep(2);
     }
-    
+
     setIsLoading(false);
   };
 
   const handleVerificationSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       const result = await verifyEmail(formData.email, verificationCode);
-      
+
       if (result.success) {
         toast.success('Email verified successfully!');
         setStep(3);
@@ -101,8 +102,8 @@ const RegisterPage = () => {
     } catch (err) {
       const errorMessage = err.response?.data?.detail;
       toast.error(
-        typeof errorMessage === 'string' 
-          ? errorMessage 
+        typeof errorMessage === 'string'
+          ? errorMessage
           : Array.isArray(errorMessage)
             ? errorMessage.map(err => err.msg).join(', ')
             : 'Failed to verify email. Please try again.'
@@ -115,7 +116,7 @@ const RegisterPage = () => {
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     // Profile is already updated during verification
     navigate('/dashboard');
     setIsLoading(false);
@@ -131,7 +132,7 @@ const RegisterPage = () => {
         <BookOpen className="h-12 w-12 text-primary-600" />
         <span className="ml-3 text-3xl font-bold text-gray-900">PeerLearn</span>
       </div>
-      
+
       <div>
         <h2 className="mt-6 text-3xl font-bold text-gray-900">
           Create your account
@@ -282,20 +283,16 @@ const RegisterPage = () => {
         </div>
 
         <div>
-          <button
+          <Button
             type="submit"
             disabled={isLoading || formData.password !== formData.confirmPassword}
-            className="btn-primary btn-lg w-full flex items-center justify-center"
+            size="lg"
+            className="w-full flex items-center justify-center"
+            isLoading={isLoading}
+            rightIcon={!isLoading && <ArrowRight className="h-4 w-4" />}
           >
-            {isLoading ? (
-              <LoadingSpinner size="sm" />
-            ) : (
-              <>
-                Create Account
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </>
-            )}
-          </button>
+            Create Account
+          </Button>
         </div>
 
         <div className="text-center">
@@ -364,17 +361,15 @@ const RegisterPage = () => {
         </div>
 
         <div>
-          <button
+          <Button
             type="submit"
             disabled={isLoading || verificationCode.length !== 6}
-            className="btn-primary btn-lg w-full flex items-center justify-center"
+            size="lg"
+            className="w-full flex items-center justify-center"
+            isLoading={isLoading}
           >
-            {isLoading ? (
-              <LoadingSpinner size="sm" />
-            ) : (
-              'Verify Email'
-            )}
-          </button>
+            Verify Email
+          </Button>
         </div>
 
         <div className="text-center">
@@ -382,8 +377,8 @@ const RegisterPage = () => {
             Didn't receive the code?{' '}
             <button
               type="button"
-              className="font-medium text-primary-600 hover:text-primary-500"
-              onClick={() => {/* TODO: Implement resend */}}
+              className="font-medium text-primary-600 hover:text-primary-500 bg-transparent border-none p-0"
+              onClick={() => {/* TODO: Implement resend */ }}
             >
               Resend code
             </button>
@@ -440,13 +435,13 @@ const RegisterPage = () => {
               placeholder="Add a study interest"
               onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addStudyInterest())}
             />
-            <button
+            <Button
               type="button"
               onClick={addStudyInterest}
-              className="btn-primary btn-md"
+              size="md"
             >
               Add
-            </button>
+            </Button>
           </div>
           <div className="flex flex-wrap gap-2">
             {formData.study_interests.map((interest, index) => (
@@ -468,20 +463,16 @@ const RegisterPage = () => {
         </div>
 
         <div>
-          <button
+          <Button
             type="submit"
             disabled={isLoading}
-            className="btn-primary btn-lg w-full flex items-center justify-center"
+            size="lg"
+            className="w-full flex items-center justify-center"
+            isLoading={isLoading}
+            rightIcon={!isLoading && <ArrowRight className="h-4 w-4" />}
           >
-            {isLoading ? (
-              <LoadingSpinner size="sm" />
-            ) : (
-              <>
-                Complete Setup
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </>
-            )}
-          </button>
+            Complete Setup
+          </Button>
         </div>
       </form>
     </motion.div>

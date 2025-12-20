@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery } from 'react-query';
 import { motion } from 'framer-motion';
-import { 
-  Plus, 
-  Users, 
-  BookOpen, 
-  TrendingUp, 
+import {
+  Plus,
+  Users,
+  BookOpen,
+  TrendingUp,
   // Calendar, // Removed unused import
   Search,
   Copy,
@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { classroomsAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
+import Button from '../components/Button';
 import CreateClassroomModal from '../components/CreateClassroomModal';
 import JoinClassroomModal from '../components/JoinClassroomModal';
 
@@ -23,7 +24,7 @@ const DashboardPage = () => {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedCode, setCopiedCode] = useState(null);
-  
+
   const { user } = useAuth();
   const navigate = useNavigate();
   // const queryClient = useQueryClient(); // Removed unused variable
@@ -98,19 +99,20 @@ const DashboardPage = () => {
           </p>
         </div>
         <div className="mt-4 sm:mt-0 flex space-x-3">
-          <button
-            onClick={() => setShowJoinModal(true)}
-            className="btn-outline btn-md"
-          >
-            Join Classroom
-          </button>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-primary btn-md flex items-center"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Classroom
-          </button>
+          <div className="mt-4 sm:mt-0 flex space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowJoinModal(true)}
+            >
+              Join Classroom
+            </Button>
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              leftIcon={<Plus className="h-4 w-4" />}
+            >
+              Create Classroom
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -171,13 +173,14 @@ const DashboardPage = () => {
               </p>
               {!searchQuery && (
                 <div className="mt-6">
-                  <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="btn-primary btn-md"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create your first classroom
-                  </button>
+                  <div className="mt-6">
+                    <Button
+                      onClick={() => setShowCreateModal(true)}
+                      leftIcon={<Plus className="h-4 w-4" />}
+                    >
+                      Create your first classroom
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -246,7 +249,7 @@ const DashboardPage = () => {
           onClose={() => setShowCreateModal(false)}
         />
       )}
-      
+
       {showJoinModal && (
         <JoinClassroomModal
           isOpen={showJoinModal}

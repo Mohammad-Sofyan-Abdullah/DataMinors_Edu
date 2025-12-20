@@ -23,6 +23,7 @@ import { notesAPI } from '../utils/api';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmModal from '../components/ConfirmModal';
+import Button from '../components/Button';
 
 const NotesPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -224,20 +225,19 @@ const NotesPage = () => {
               </p>
             </div>
             <div className="flex items-center space-x-3">
-              <button
+              <Button
                 onClick={() => setShowUploadModal(true)}
-                className="btn-outline flex items-center space-x-2"
+                variant="outline"
+                leftIcon={<Upload className="h-4 w-4" />}
               >
-                <Upload className="h-4 w-4" />
-                <span>Upload Document</span>
-              </button>
-              <button
+                Upload Document
+              </Button>
+              <Button
                 onClick={() => setShowCreateModal(true)}
-                className="btn-primary flex items-center space-x-2"
+                leftIcon={<Plus className="h-4 w-4" />}
               >
-                <Plus className="h-4 w-4" />
-                <span>New Document</span>
-              </button>
+                New Document
+              </Button>
             </div>
           </div>
         </div>
@@ -286,20 +286,19 @@ const NotesPage = () => {
                 Get started by creating a new document or uploading an existing one.
               </p>
               <div className="mt-6 flex justify-center space-x-3">
-                <button
+                <Button
                   onClick={() => setShowCreateModal(true)}
-                  className="btn-primary flex items-center space-x-2"
+                  leftIcon={<Plus className="h-4 w-4" />}
                 >
-                  <Plus className="h-4 w-4" />
-                  <span>New Document</span>
-                </button>
-                <button
+                  New Document
+                </Button>
+                <Button
                   onClick={() => setShowUploadModal(true)}
-                  className="btn-outline flex items-center space-x-2"
+                  variant="outline"
+                  leftIcon={<Upload className="h-4 w-4" />}
                 >
-                  <Upload className="h-4 w-4" />
-                  <span>Upload Document</span>
-                </button>
+                  Upload Document
+                </Button>
               </div>
             </div>
           ) : (
@@ -381,27 +380,31 @@ const NotesPage = () => {
                             </span>
                           )}
                         </div>
-                        <button className="w-full btn-primary flex items-center justify-center space-x-2 text-sm py-2">
-                          <Play className="h-4 w-4" />
-                          <span>Open Session</span>
-                        </button>
+                        <Button
+                          className="w-full justify-center text-sm py-2"
+                          leftIcon={<Play className="h-4 w-4" />}
+                        >
+                          Open Session
+                        </Button>
                       </div>
                     ) : (
                       <div className="mt-2">
                         <p className="text-sm text-gray-500 line-clamp-2 mb-3 h-10">
                           {doc.content ? doc.content.substring(0, 80) + '...' : 'No preview available'}
                         </p>
-                        <button
+                        <Button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleCreateSession(doc);
                           }}
                           disabled={createSessionMutation.isLoading}
-                          className="w-full btn-outline flex items-center justify-center space-x-2 text-sm py-2"
+                          variant="outline"
+                          className="w-full justify-center text-sm py-2"
+                          isLoading={createSessionMutation.isLoading}
+                          leftIcon={!createSessionMutation.isLoading && <Sparkles className="h-4 w-4" />}
                         >
-                          <Sparkles className="h-4 w-4" />
-                          <span>Start AI Session</span>
-                        </button>
+                          Start AI Session
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -435,23 +438,23 @@ const NotesPage = () => {
                   />
                 </div>
                 <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => {
                       setShowCreateModal(false);
                       setNewDocumentTitle('');
                     }}
-                    className="btn-outline"
+                    variant="outline"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
                     disabled={createDocumentMutation.isLoading}
-                    className="btn-primary"
+                    isLoading={createDocumentMutation.isLoading}
                   >
-                    {createDocumentMutation.isLoading ? 'Creating...' : 'Create'}
-                  </button>
+                    Create
+                  </Button>
                 </div>
               </form>
             </div>
@@ -497,24 +500,24 @@ const NotesPage = () => {
                   </div>
                 </div>
                 <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => {
                       setShowUploadModal(false);
                       setUploadFile(null);
                       setUploadTitle('');
                     }}
-                    className="btn-outline"
+                    variant="outline"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
                     disabled={uploadDocumentMutation.isLoading}
-                    className="btn-primary"
+                    isLoading={uploadDocumentMutation.isLoading}
                   >
-                    {uploadDocumentMutation.isLoading ? 'Uploading...' : 'Upload'}
-                  </button>
+                    Upload
+                  </Button>
                 </div>
               </form>
             </div>

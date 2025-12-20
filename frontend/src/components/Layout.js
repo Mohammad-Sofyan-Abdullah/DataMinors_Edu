@@ -21,6 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import { friendsAPI, messagesAPI } from '../utils/api';
 import LoadingSpinner from './LoadingSpinner';
+import Button from './Button';
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -239,13 +240,13 @@ const Layout = () => {
                   </div>
 
                   {/* Logout button */}
-                  <button
+                  <Button
                     onClick={handleLogout}
-                    className="flex items-center space-x-2 rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    variant="ghost"
+                    leftIcon={<LogOut className="h-4 w-4" />}
                   >
-                    <LogOut className="h-4 w-4" />
-                    <span>Logout</span>
-                  </button>
+                    Logout
+                  </Button>
                 </div>
               </div>
             </div>

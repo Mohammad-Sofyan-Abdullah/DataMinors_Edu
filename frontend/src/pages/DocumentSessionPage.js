@@ -32,10 +32,12 @@ import {
 import { notesAPI } from '../utils/api';
 import api from '../utils/api'; // Import default api for baseURL
 import toast from 'react-hot-toast';
+import Button from '../components/Button';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ShareToFriendModal from '../components/ShareToFriendModal';
 import ConfirmModal from '../components/ConfirmModal';
 
+// Button import verified
 const DocumentSessionPage = () => {
     const { sessionId } = useParams();
     const navigate = useNavigate();
@@ -247,12 +249,12 @@ const DocumentSessionPage = () => {
             <div className="min-h-screen flex flex-col items-center justify-center">
                 <FileText className="h-16 w-16 text-gray-300 mb-4" />
                 <h2 className="text-xl font-semibold text-gray-700">Session not found</h2>
-                <button
+                <Button
                     onClick={() => navigate('/notes')}
-                    className="mt-4 btn-primary"
+                    className="mt-4"
                 >
                     Back to Notes
-                </button>
+                </Button>
             </div>
         );
     }
@@ -288,20 +290,23 @@ const DocumentSessionPage = () => {
                             </div>
                         </div>
                         <div className="flex items-center space-x-3 flex-none">
-                            <button
+                            <Button
                                 onClick={() => handleShare('document_session')}
-                                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors space-x-2"
+                                variant="outline"
+                                className="bg-white"
+                                size="sm"
+                                leftIcon={<Share2 className="h-4 w-4" />}
                             >
-                                <Share2 className="h-4 w-4" />
-                                <span>Share</span>
-                            </button>
-                            <button
+                                Share
+                            </Button>
+                            <Button
                                 onClick={() => setShowDeleteModal(true)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                variant="ghost"
+                                className="p-2 h-auto text-red-600 hover:bg-red-50 hover:text-red-700"
                                 title="Delete Session"
                             >
                                 <Trash2 className="h-5 w-5" />
-                            </button>
+                            </Button>
                         </div>
                     </div>
 
@@ -424,14 +429,14 @@ const DocumentSessionPage = () => {
                                             className="flex-1 input"
                                             disabled={chatMutation.isLoading}
                                         />
-                                        <button
+                                        <Button
                                             type="submit"
                                             disabled={!chatMessage.trim() || chatMutation.isLoading}
-                                            className="btn-primary flex items-center space-x-2"
+                                            isLoading={chatMutation.isLoading}
+                                            leftIcon={!chatMutation.isLoading && <Send className="h-4 w-4" />}
                                         >
-                                            <Send className="h-4 w-4" />
-                                            <span>Send</span>
-                                        </button>
+                                            Send
+                                        </Button>
                                     </div>
                                 </form>
                             </motion.div>
@@ -455,18 +460,15 @@ const DocumentSessionPage = () => {
                                         <p className="text-gray-500 mb-4">
                                             Generate AI-powered summaries of your document
                                         </p>
-                                        <button
+                                        <Button
                                             onClick={() => summarizeMutation.mutate()}
                                             disabled={summarizeMutation.isLoading}
-                                            className="btn-primary flex items-center space-x-2 mx-auto"
+                                            isLoading={summarizeMutation.isLoading}
+                                            className="mx-auto"
+                                            leftIcon={!summarizeMutation.isLoading && <Sparkles className="h-4 w-4" />}
                                         >
-                                            {summarizeMutation.isLoading ? (
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                            ) : (
-                                                <Sparkles className="h-4 w-4" />
-                                            )}
-                                            <span>{summarizeMutation.isLoading ? 'Generating...' : 'Generate Summary'}</span>
-                                        </button>
+                                            Generate Summary
+                                        </Button>
                                     </div>
                                 ) : (
                                     <>
@@ -552,18 +554,16 @@ const DocumentSessionPage = () => {
                                             </p>
                                         </div>
                                     </div>
-                                    <button
+                                    <Button
                                         onClick={() => flashcardsMutation.mutate()}
                                         disabled={flashcardsMutation.isLoading}
-                                        className="btn-outline flex items-center space-x-2 text-sm"
+                                        variant="outline"
+                                        size="sm"
+                                        leftIcon={!flashcardsMutation.isLoading && <RefreshCw className="h-4 w-4" />}
+                                        isLoading={flashcardsMutation.isLoading}
                                     >
-                                        {flashcardsMutation.isLoading ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <RefreshCw className="h-4 w-4" />
-                                        )}
-                                        <span>Regenerate</span>
-                                    </button>
+                                        Regenerate
+                                    </Button>
                                 </div>
 
                                 {/* Main Content */}
@@ -577,18 +577,15 @@ const DocumentSessionPage = () => {
                                             <p className="text-gray-500 mb-8 leading-relaxed">
                                                 Generate flashcards from your document to start testing your knowledge and memorizing key concepts.
                                             </p>
-                                            <button
+                                            <Button
                                                 onClick={() => flashcardsMutation.mutate()}
                                                 disabled={flashcardsMutation.isLoading}
-                                                className="btn-primary w-full justify-center py-3 text-base shadow-lg shadow-primary-500/20"
+                                                className="w-full justify-center py-3 text-base shadow-lg shadow-primary-500/20"
+                                                isLoading={flashcardsMutation.isLoading}
+                                                leftIcon={!flashcardsMutation.isLoading && <Sparkles className="h-5 w-5" />}
                                             >
-                                                {flashcardsMutation.isLoading ? (
-                                                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                                                ) : (
-                                                    <Sparkles className="h-5 w-5 mr-2" />
-                                                )}
                                                 Generate Flashcards
-                                            </button>
+                                            </Button>
                                         </div>
                                     ) : (
                                         <div className="w-full max-w-3xl flex flex-col gap-8">
@@ -711,18 +708,15 @@ const DocumentSessionPage = () => {
                                         </h3>
                                         <p className="text-sm text-gray-600">Test your knowledge of the document</p>
                                     </div>
-                                    <button
+                                    <Button
                                         onClick={() => quizMutation.mutate()}
                                         disabled={quizMutation.isLoading}
-                                        className="btn-outline flex items-center space-x-2"
+                                        variant="outline"
+                                        leftIcon={!quizMutation.isLoading && <RefreshCw className="h-4 w-4" />}
+                                        isLoading={quizMutation.isLoading}
                                     >
-                                        {quizMutation.isLoading ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <RefreshCw className="h-4 w-4" />
-                                        )}
-                                        <span>{session?.quiz?.questions?.length ? 'New Quiz' : 'Generate'}</span>
-                                    </button>
+                                        {session?.quiz?.questions?.length ? 'New Quiz' : 'Generate'}
+                                    </Button>
                                 </div>
 
                                 {(!session?.quiz?.questions || session.quiz.questions.length === 0) ? (
@@ -735,14 +729,14 @@ const DocumentSessionPage = () => {
                                                 : 'Generate a summary first, then create a quiz'}
                                         </p>
                                         {session.detailed_summary && (
-                                            <button
+                                            <Button
                                                 onClick={() => quizMutation.mutate()}
                                                 disabled={quizMutation.isLoading}
-                                                className="btn-primary flex items-center space-x-2 mx-auto"
+                                                className="mx-auto"
+                                                leftIcon={<Sparkles className="h-4 w-4" />}
                                             >
-                                                <Sparkles className="h-4 w-4" />
-                                                <span>Generate Quiz</span>
-                                            </button>
+                                                Generate Quiz
+                                            </Button>
                                         )}
                                     </div>
                                 ) : !showQuizResults ? (
@@ -794,12 +788,11 @@ const DocumentSessionPage = () => {
                                                 Previous
                                             </button>
                                             {currentQuizIndex === session.quiz.questions.length - 1 ? (
-                                                <button
+                                                <Button
                                                     onClick={() => setShowQuizResults(true)}
-                                                    className="btn-primary"
                                                 >
-                                                    Finish Quiz
-                                                </button>
+                                                    Submit Quiz
+                                                </Button>
                                             ) : (
                                                 <button
                                                     onClick={() => setCurrentQuizIndex(prev => prev + 1)}

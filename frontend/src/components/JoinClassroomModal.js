@@ -4,10 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Users, Loader2 } from 'lucide-react';
 import { classroomsAPI } from '../utils/api';
 import toast from 'react-hot-toast';
+import Button from './Button';
 
 const JoinClassroomModal = ({ isOpen, onClose }) => {
   const [inviteCode, setInviteCode] = useState('');
-  
+
   const queryClient = useQueryClient();
 
   const joinClassroomMutation = useMutation(classroomsAPI.joinClassroom, {
@@ -44,7 +45,7 @@ const JoinClassroomModal = ({ isOpen, onClose }) => {
             className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
             onClick={onClose}
           />
-          
+
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -93,25 +94,21 @@ const JoinClassroomModal = ({ isOpen, onClose }) => {
                 </div>
 
                 <div className="flex justify-end space-x-3 pt-4">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={onClose}
-                    className="btn-outline btn-md"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
                     disabled={joinClassroomMutation.isLoading || !inviteCode.trim()}
-                    className="btn-primary btn-md flex items-center"
+                    isLoading={joinClassroomMutation.isLoading}
+                    leftIcon={!joinClassroomMutation.isLoading && <Users className="h-4 w-4" />}
                   >
-                    {joinClassroomMutation.isLoading ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Users className="h-4 w-4 mr-2" />
-                    )}
                     Join Classroom
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>

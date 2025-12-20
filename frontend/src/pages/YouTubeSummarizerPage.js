@@ -33,6 +33,7 @@ import toast from 'react-hot-toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Flashcard from '../components/Flashcard';
 import ShareToFriendModal from '../components/ShareToFriendModal';
+import Button from '../components/Button';
 
 const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOpen = true, onToggleSidebar }) => {
   const queryClient = useQueryClient();
@@ -473,18 +474,22 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
             </div>
 
             {/* Sidebar Toggle Button */}
-            <button
-              onClick={onToggleSidebar}
-              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors group"
-              aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
-              title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
-            >
-              {isSidebarOpen ? (
-                <X className="h-5 w-5 text-gray-600 group-hover:text-gray-800" />
-              ) : (
-                <Menu className="h-5 w-5 text-gray-600 group-hover:text-gray-800" />
-              )}
-            </button>
+            <div className="bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors group">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggleSidebar}
+                aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+                title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+                className="p-2 h-auto"
+              >
+                {isSidebarOpen ? (
+                  <X className="h-5 w-5 text-gray-600 group-hover:text-gray-800" />
+                ) : (
+                  <Menu className="h-5 w-5 text-gray-600 group-hover:text-gray-800" />
+                )}
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -519,23 +524,16 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                 />
               </div>
 
-              <button
+              <Button
                 type="submit"
+                size="lg"
+                className="w-full flex items-center justify-center"
                 disabled={isProcessing || !videoUrl.trim()}
-                className="w-full btn-primary btn-lg flex items-center justify-center"
+                isLoading={isProcessing}
+                leftIcon={!isProcessing && <Youtube className="h-5 w-5" />}
               >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    Processing Video...
-                  </>
-                ) : (
-                  <>
-                    <Youtube className="h-5 w-5 mr-2" />
-                    Summarize Video
-                  </>
-                )}
-              </button>
+                {isProcessing ? 'Processing Video...' : 'Summarize Video'}
+              </Button>
             </form>
 
             {isProcessing && (
@@ -601,83 +599,97 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
           </div>
 
           {/* Sidebar Toggle Button */}
-          <button
-            onClick={onToggleSidebar}
-            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors group"
-            aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
-            title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
-          >
-            {isSidebarOpen ? (
-              <X className="h-5 w-5 text-gray-600 group-hover:text-gray-800" />
-            ) : (
-              <Menu className="h-5 w-5 text-gray-600 group-hover:text-gray-800" />
-            )}
-          </button>
+          {/* Sidebar Toggle Button */}
+          <div className="bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors group">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggleSidebar}
+              aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+              title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+              className="p-2 h-auto"
+            >
+              {isSidebarOpen ? (
+                <X className="h-5 w-5 text-gray-600 group-hover:text-gray-800" />
+              ) : (
+                <Menu className="h-5 w-5 text-gray-600 group-hover:text-gray-800" />
+              )}
+            </Button>
+          </div>
 
           <div className="flex items-center space-x-2 flex-shrink-0">
             {/* Share Session Button */}
-            <button
+            {/* Share Session Button */}
+            <Button
               onClick={handleShareSession}
-              className="flex items-center gap-2 px-3 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+              className="bg-green-500 hover:bg-green-600 text-white border-transparent"
+              size="sm"
               title="Share session with friends"
+              leftIcon={<Share2 className="h-4 w-4" />}
             >
-              <Share2 className="h-4 w-4" />
-              <span className="text-sm font-medium hidden sm:inline">Share Session</span>
-            </button>
+              <span className="hidden sm:inline">Share Session</span>
+            </Button>
 
             <div className="relative">
-              <button
+              <Button
+                variant="ghost"
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                className="p-2 h-auto text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
               >
                 <Download className="h-5 w-5" />
-              </button>
+              </Button>
 
               {showExportMenu && (
                 <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                  <button
+                  <Button
                     onClick={() => handleExport('pdf')}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    variant="ghost"
+                    className="w-full justify-start px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 h-auto rounded-none"
+                    leftIcon={<FileText className="h-4 w-4" />}
                   >
-                    <FileText className="h-4 w-4 mr-2" />
                     Export as PDF
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => handleExport('docx')}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    variant="ghost"
+                    className="w-full justify-start px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 h-auto rounded-none"
+                    leftIcon={<FileText className="h-4 w-4" />}
                   >
-                    <FileText className="h-4 w-4 mr-2" />
                     Export as DOCX
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => handleExport('markdown')}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    variant="ghost"
+                    className="w-full justify-start px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 h-auto rounded-none"
+                    leftIcon={<FileText className="h-4 w-4" />}
                   >
-                    <FileText className="h-4 w-4 mr-2" />
                     Export as Markdown
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
 
-            <button
+            <Button
+              variant="ghost"
               onClick={() => regenerateMutation.mutate(selectedSessionId)}
               disabled={regenerateMutation.isLoading}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+              isLoading={regenerateMutation.isLoading}
+              className="p-2 h-auto text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
             >
-              <RefreshCw className={`h-5 w-5 ${regenerateMutation.isLoading ? 'animate-spin' : ''}`} />
-            </button>
+              {!regenerateMutation.isLoading && <RefreshCw className="h-5 w-5" />}
+            </Button>
 
-            <button
+            <Button
+              variant="ghost"
               onClick={() => {
                 if (window.confirm('Are you sure you want to delete this session?')) {
                   deleteSessionMutation.mutate(selectedSessionId);
                 }
               }}
-              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+              className="p-2 h-auto text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
             >
               <Trash2 className="h-5 w-5" />
-            </button>
+            </Button>
           </div>
         </div>
       </div>

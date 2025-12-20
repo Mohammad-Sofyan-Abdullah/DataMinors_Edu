@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, BookOpen, Sparkles, Loader2 } from 'lucide-react';
 import { classroomsAPI } from '../utils/api';
 import toast from 'react-hot-toast';
+import Button from './Button';
 
 const CreateClassroomModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
@@ -13,7 +14,7 @@ const CreateClassroomModal = ({ isOpen, onClose }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
-  
+
   const queryClient = useQueryClient();
 
   const createClassroomMutation = useMutation(
@@ -89,7 +90,7 @@ const CreateClassroomModal = ({ isOpen, onClose }) => {
             className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
             onClick={onClose}
           />
-          
+
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -146,19 +147,18 @@ const CreateClassroomModal = ({ isOpen, onClose }) => {
                     className="input mt-1"
                     placeholder="Describe what this classroom is for..."
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={handleGetSuggestions}
-                    disabled={!formData.description.trim() || isLoadingSuggestions}
-                    className="mt-2 btn-outline btn-sm flex items-center"
+                    disabled={!formData.description.trim()}
+                    isLoading={isLoadingSuggestions}
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    leftIcon={<Sparkles className="h-4 w-4" />}
                   >
-                    {isLoadingSuggestions ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4 mr-2" />
-                    )}
                     Get AI Name Suggestions
-                  </button>
+                  </Button>
                 </div>
 
                 {showSuggestions && suggestions.length > 0 && (
@@ -180,25 +180,20 @@ const CreateClassroomModal = ({ isOpen, onClose }) => {
                 )}
 
                 <div className="flex justify-end space-x-3 pt-4">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={onClose}
-                    className="btn-outline btn-md"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
-                    disabled={createClassroomMutation.isLoading}
-                    className="btn-primary btn-md flex items-center"
+                    isLoading={createClassroomMutation.isLoading}
+                    leftIcon={<BookOpen className="h-4 w-4" />}
                   >
-                    {createClassroomMutation.isLoading ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <BookOpen className="h-4 w-4 mr-2" />
-                    )}
                     Create Classroom
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>

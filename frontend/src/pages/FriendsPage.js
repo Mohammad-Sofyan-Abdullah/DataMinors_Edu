@@ -17,6 +17,7 @@ import {
 import { friendsAPI } from '../utils/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmModal from '../components/ConfirmModal';
+import Button from '../components/Button';
 import toast from 'react-hot-toast';
 
 const FriendsPage = () => {
@@ -155,8 +156,8 @@ const FriendsPage = () => {
           <button
             onClick={() => handleTabChange('friends')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'friends'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             <div className="flex items-center gap-2">
@@ -171,8 +172,8 @@ const FriendsPage = () => {
           <button
             onClick={() => handleTabChange('requests')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'requests'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             <div className="flex items-center gap-2">
@@ -189,8 +190,8 @@ const FriendsPage = () => {
           <button
             onClick={() => handleTabChange('find')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'find'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             <div className="flex items-center gap-2">
@@ -223,12 +224,11 @@ const FriendsPage = () => {
                 <p className="text-gray-500 mb-6 max-w-sm mx-auto">
                   Start building your network by searching for classmates and sending friend requests.
                 </p>
-                <button
+                <Button
                   onClick={() => handleTabChange('find')}
-                  className="btn-primary"
                 >
                   Find Friends
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -248,20 +248,22 @@ const FriendsPage = () => {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <button
+                        <Button
                           onClick={() => navigate(`/messages/${friend.id || friend._id}`)}
-                          className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                          variant="ghost"
+                          className="p-2 h-auto text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full"
                           title="Send message"
                         >
                           <MessageCircle className="h-5 w-5" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => handleRemoveFriend(friend.id || friend._id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                          variant="ghost"
+                          className="p-2 h-auto text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full"
                           title="Remove friend"
                         >
                           <UserX className="h-5 w-5" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
 
@@ -327,22 +329,23 @@ const FriendsPage = () => {
                           </div>
                         </div>
                         <div className="flex gap-3 w-full sm:w-auto">
-                          <button
+                          <Button
                             onClick={() => acceptRequestMutation.mutate(requestId)}
                             disabled={acceptRequestMutation.isLoading}
-                            className="flex-1 sm:flex-none btn-primary flex items-center justify-center gap-2"
+                            className="flex-1 sm:flex-none justify-center"
+                            leftIcon={<Check className="h-4 w-4" />}
                           >
-                            <Check className="h-4 w-4" />
                             Accept
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             onClick={() => declineRequestMutation.mutate(requestId)}
                             disabled={declineRequestMutation.isLoading}
-                            className="flex-1 sm:flex-none btn-outline text-red-600 border-red-200 hover:bg-red-50 flex items-center justify-center gap-2"
+                            variant="outline"
+                            className="flex-1 sm:flex-none text-red-600 border-red-200 hover:bg-red-50 justify-center"
+                            leftIcon={<X className="h-4 w-4" />}
                           >
-                            <X className="h-4 w-4" />
                             Decline
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     );
@@ -408,14 +411,15 @@ const FriendsPage = () => {
                                 {result.request_sent_by_me ? 'Request Sent' : 'Request Received'}
                               </span>
                             ) : (
-                              <button
+                              <Button
                                 onClick={() => sendRequestMutation.mutate(result.user.id || result.user._id)}
                                 disabled={sendRequestMutation.isLoading}
-                                className="btn-outline btn-sm"
+                                variant="outline"
+                                size="sm"
+                                leftIcon={<UserPlus className="h-4 w-4" />}
                               >
-                                <UserPlus className="h-4 w-4 mr-1" />
                                 Connect
-                              </button>
+                              </Button>
                             )}
                           </div>
                         </div>

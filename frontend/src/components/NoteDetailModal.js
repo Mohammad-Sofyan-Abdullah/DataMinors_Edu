@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Download, Star, Eye, FileText, User, MessageCircle, ShoppingCart } from 'lucide-react';
 import { marketplaceAPI } from '../utils/api';
 import toast from 'react-hot-toast';
+import Button from './Button';
 
 const NoteDetailModal = ({ note, onClose, onPurchase }) => {
   const queryClient = useQueryClient();
@@ -24,7 +25,7 @@ const NoteDetailModal = ({ note, onClose, onPurchase }) => {
     {
       onSuccess: async (response) => {
         toast.success(response.data.message);
-        
+
         // Trigger download
         try {
           const downloadResponse = await marketplaceAPI.downloadNote(note.id);
@@ -41,7 +42,7 @@ const NoteDetailModal = ({ note, onClose, onPurchase }) => {
         } catch (error) {
           toast.error('Purchase successful but download failed. Try from My Purchases.');
         }
-        
+
         // Call onPurchase callback which handles wallet refetch in parent
         onPurchase();
       },
@@ -181,11 +182,10 @@ const NoteDetailModal = ({ note, onClose, onPurchase }) => {
                             className="focus:outline-none"
                           >
                             <Star
-                              className={`h-6 w-6 ${
-                                star <= rating
+                              className={`h-6 w-6 ${star <= rating
                                   ? 'text-yellow-400 fill-current'
                                   : 'text-gray-300'
-                              }`}
+                                }`}
                             />
                           </button>
                         ))}
@@ -241,11 +241,10 @@ const NoteDetailModal = ({ note, onClose, onPurchase }) => {
                             {[...Array(5)].map((_, idx) => (
                               <Star
                                 key={idx}
-                                className={`h-4 w-4 ${
-                                  idx < review.rating
+                                className={`h-4 w-4 ${idx < review.rating
                                     ? 'text-yellow-400 fill-current'
                                     : 'text-gray-300'
-                                }`}
+                                  }`}
                               />
                             ))}
                           </div>
@@ -280,26 +279,15 @@ const NoteDetailModal = ({ note, onClose, onPurchase }) => {
                     </div>
                   )}
                 </div>
-                <button
+                <Button
                   onClick={handlePurchase}
                   disabled={purchaseMutation.isLoading}
-                  className="w-full btn-primary flex items-center justify-center"
+                  isLoading={purchaseMutation.isLoading}
+                  className="w-full flex items-center justify-center"
+                  leftIcon={!purchaseMutation.isLoading && <ShoppingCart className="h-5 w-5" />}
                 >
-                  {purchaseMutation.isLoading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="h-5 w-5 mr-2" />
-                      {note.is_free ? 'Download' : 'Purchase'}
-                    </>
-                  )}
-                </button>
+                  {note.is_free ? 'Download' : 'Purchase'}
+                </Button>
               </div>
 
               {/* Info Card */}
@@ -328,16 +316,17 @@ const NoteDetailModal = ({ note, onClose, onPurchase }) => {
               </div>
 
               {/* Contact Seller */}
-              <button 
+              <Button
+                variant="outline"
                 onClick={() => {
                   onClose();
                   navigate(`/messages/${note.seller_id}`);
                 }}
-                className="w-full bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium flex items-center justify-center transition-colors"
+                className="w-full flex items-center justify-center"
+                leftIcon={<MessageCircle className="h-5 w-5" />}
               >
-                <MessageCircle className="h-5 w-5 mr-2" />
                 Contact Seller
-              </button>
+              </Button>
             </div>
           </div>
         </div>

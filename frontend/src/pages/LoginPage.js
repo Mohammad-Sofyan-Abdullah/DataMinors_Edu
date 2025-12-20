@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, Mail, Lock, BookOpen, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import Button from '../components/Button';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const LoginPage = () => {
@@ -12,7 +13,7 @@ const LoginPage = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const { login, isAuthenticated, error, clearError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,13 +40,13 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     const result = await login(formData.email, formData.password);
-    
+
     if (result.success) {
       navigate(from, { replace: true });
     }
-    
+
     setIsLoading(false);
   };
 
@@ -63,7 +64,7 @@ const LoginPage = () => {
               <BookOpen className="h-12 w-12 text-primary-600" />
               <span className="ml-3 text-3xl font-bold text-gray-900">PeerLearn</span>
             </div>
-            
+
             <div>
               <h2 className="mt-6 text-3xl font-bold text-gray-900">
                 Welcome back
@@ -143,20 +144,15 @@ const LoginPage = () => {
               </div>
 
               <div>
-                <button
+                <Button
                   type="submit"
-                  disabled={isLoading}
-                  className="btn-primary btn-lg w-full flex items-center justify-center"
+                  size="lg"
+                  className="w-full"
+                  isLoading={isLoading}
+                  rightIcon={<ArrowRight className="h-4 w-4" />}
                 >
-                  {isLoading ? (
-                    <LoadingSpinner size="sm" />
-                  ) : (
-                    <>
-                      Sign in
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </>
-                  )}
-                </button>
+                  Sign in
+                </Button>
               </div>
 
               <div className="text-center">
