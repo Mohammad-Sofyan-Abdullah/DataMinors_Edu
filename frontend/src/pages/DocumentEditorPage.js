@@ -8,18 +8,15 @@ import {
   Bold,
   Italic,
   Underline,
-  Type,
   MessageSquare,
   Send,
   Loader,
   FileText,
   Sparkles,
-  History,
   Undo,
   Redo,
-  AlignLeft,
-  AlignCenter,
-  AlignRight
+  Highlighter,
+  Trash2
 } from 'lucide-react';
 import { notesAPI } from '../utils/api';
 import toast from 'react-hot-toast';
@@ -40,10 +37,9 @@ const DocumentEditorPage = () => {
   const [fontFamily, setFontFamily] = useState('Inter');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
-  // Undo/Redo functionality
-  const [history, setHistory] = useState([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const [isUpdatingFromHistory, setIsUpdatingFromHistory] = useState(false);
+  // Simple undo/redo state
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
 
   // Fetch document
   const { data: document, isLoading } = useQuery(
@@ -53,6 +49,11 @@ const DocumentEditorPage = () => {
       onSuccess: (data) => {
         setTitle(data.title);
         setContent(data.content || '');
+        setUndoStack([data.content || '']);
+        // Set initial content in editor
+        if (editorRef.current) {
+          editorRef.current.innerHTML = data.content || '';
+        }
       },
       onError: () => {
         toast.error('Failed to load document');
@@ -86,6 +87,18 @@ const DocumentEditorPage = () => {
     }
   );
 
+  // Delete document mutation
+  const deleteDocumentMutation = useMutation(
+    () => notesAPI.deleteDocument(documentId),
+    {
+      onSuccess: () => {
+        toast.success('Document deleted');
+        navigate('/notes');
+      },
+      onError: () => toast.error('Failed to delete document')
+    }
+  );
+
   // Chat mutation
   const chatMutation = useMutation(
     (message) => notesAPI.chatWithDocument(documentId, message),
@@ -106,7 +119,6 @@ const DocumentEditorPage = () => {
     {
       onSuccess: (response) => {
         const generatedNotes = response.data.notes;
-        // Insert notes at cursor position or end of document
         insertTextAtCursor(generatedNotes);
         toast.success('Notes generated and inserted');
       },
@@ -114,73 +126,219 @@ const DocumentEditorPage = () => {
     }
   );
 
-  // Initialize history when document loads
-  useEffect(() => {
-    if (document && content && history.length === 0) {
-      setHistory([{ content, title }]);
-      setHistoryIndex(0);
-    }
-  }, [document, content, title, history.length]);
+  // Save to undo stack
+  const saveToUndoStack = useCallback(() => {
+    setUndoStack(prev => {
+      const newStack = [...prev];
+      if (newStack[newStack.length - 1] !== content) {
+        newStack.push(content);
+        return newStack.slice(-20);
+      }
+      return newStack;
+    });
+    setRedoStack([]);
+  }, [content]);
 
-  // Add to history when content changes (debounced)
-  const addToHistory = useCallback((newContent, newTitle) => {
-    if (isUpdatingFromHistory) return;
-    
-    const newState = { content: newContent, title: newTitle };
-    const currentState = history[historyIndex];
-    
-    // Don't add if content is the same
-    if (currentState && currentState.content === newContent && currentState.title === newTitle) {
+  // Handle content change
+  const handleContentChange = useCallback((newContent) => {
+    setContent(newContent);
+    setHasUnsavedChanges(true);
+  }, []);
+
+  // Rich text formatting with execCommand
+  const applyFormatting = useCallback((command, value = null) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const selection = window.getSelection();
+    if (!selection.rangeCount || selection.isCollapsed) {
+      toast.error('Please select text to format');
       return;
     }
-    
-    // Remove any future history if we're not at the end
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(newState);
-    
-    // Limit history to 50 entries
-    if (newHistory.length > 50) {
-      newHistory.shift();
-    } else {
-      setHistoryIndex(prev => prev + 1);
-    }
-    
-    setHistory(newHistory);
-  }, [history, historyIndex, isUpdatingFromHistory]);
 
-  // Debounced history update
-  useEffect(() => {
-    if (!isUpdatingFromHistory && (content || title)) {
-      const timer = setTimeout(() => {
-        addToHistory(content, title);
-      }, 1000);
-      return () => clearTimeout(timer);
+    saveToUndoStack();
+
+    try {
+      // Focus the editor first
+      editor.focus();
+      
+      // Apply the formatting
+      document.execCommand(command, false, value);
+      
+      // Update content state
+      handleContentChange(editor.innerHTML);
+      
+    } catch (error) {
+      console.error('Formatting error:', error);
+      // Fallback to manual formatting
+      applyManualFormatting(command, value);
     }
-  }, [content, title, addToHistory, isUpdatingFromHistory]);
+  }, [saveToUndoStack, handleContentChange]);
+
+  // Manual formatting fallback
+  const applyManualFormatting = useCallback((command, value) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    try {
+      const range = selection.getRangeAt(0);
+      const selectedText = range.toString();
+      
+      if (!selectedText) return;
+
+      let element;
+      switch (command) {
+        case 'bold':
+          element = document.createElement('strong');
+          break;
+        case 'italic':
+          element = document.createElement('em');
+          break;
+        case 'underline':
+          element = document.createElement('u');
+          break;
+        case 'hiliteColor':
+          element = document.createElement('mark');
+          if (value) element.style.backgroundColor = value;
+          break;
+        default:
+          return;
+      }
+
+      const fragment = range.extractContents();
+      element.appendChild(fragment);
+      range.insertNode(element);
+
+      // Clear selection
+      selection.removeAllRanges();
+      const newRange = document.createRange();
+      newRange.setStartAfter(element);
+      newRange.collapse(true);
+      selection.addRange(newRange);
+
+      handleContentChange(editor.innerHTML);
+    } catch (error) {
+      console.error('Manual formatting error:', error);
+    }
+  }, [handleContentChange]);
+
+  const handleBold = useCallback(() => {
+    applyFormatting('bold');
+  }, [applyFormatting]);
+
+  const handleItalic = useCallback(() => {
+    applyFormatting('italic');
+  }, [applyFormatting]);
+
+  const handleUnderline = useCallback(() => {
+    applyFormatting('underline');
+  }, [applyFormatting]);
+
+  const handleHighlight = useCallback(() => {
+    applyFormatting('hiliteColor', '#ffff00');
+  }, [applyFormatting]);
 
   // Undo function
-  const handleUndo = () => {
-    if (historyIndex > 0) {
-      setIsUpdatingFromHistory(true);
-      const prevState = history[historyIndex - 1];
-      setContent(prevState.content);
-      setTitle(prevState.title);
-      setHistoryIndex(prev => prev - 1);
-      setTimeout(() => setIsUpdatingFromHistory(false), 100);
+  const handleUndo = useCallback(() => {
+    if (undoStack.length > 1) {
+      const currentContent = undoStack[undoStack.length - 1];
+      const previousContent = undoStack[undoStack.length - 2];
+      
+      setRedoStack(prev => [...prev, currentContent]);
+      setUndoStack(prev => prev.slice(0, -1));
+      
+      setContent(previousContent);
+      setHasUnsavedChanges(true);
+      
+      if (editorRef.current) {
+        editorRef.current.innerHTML = previousContent;
+      }
     }
-  };
+  }, [undoStack]);
 
   // Redo function
-  const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      setIsUpdatingFromHistory(true);
-      const nextState = history[historyIndex + 1];
-      setContent(nextState.content);
-      setTitle(nextState.title);
-      setHistoryIndex(prev => prev + 1);
-      setTimeout(() => setIsUpdatingFromHistory(false), 100);
+  const handleRedo = useCallback(() => {
+    if (redoStack.length > 0) {
+      const nextContent = redoStack[redoStack.length - 1];
+      
+      setUndoStack(prev => [...prev, content]);
+      setRedoStack(prev => prev.slice(0, -1));
+      
+      setContent(nextContent);
+      setHasUnsavedChanges(true);
+      
+      if (editorRef.current) {
+        editorRef.current.innerHTML = nextContent;
+      }
     }
-  };
+  }, [redoStack, content]);
+
+  // Save function
+  const handleSave = useCallback(() => {
+    if (!hasUnsavedChanges) return;
+    
+    // Convert HTML to clean text for storage
+    let cleanContent = content;
+    // Keep basic HTML formatting for storage
+    cleanContent = cleanContent.replace(/<div>/g, '\n').replace(/<\/div>/g, '');
+    cleanContent = cleanContent.replace(/<br\s*\/?>/g, '\n');
+    cleanContent = cleanContent.replace(/&nbsp;/g, ' ');
+    
+    updateDocumentMutation.mutate({
+      title: title.trim(),
+      content: cleanContent
+    });
+  }, [hasUnsavedChanges, title, content, updateDocumentMutation]);
+
+  // Delete function
+  const handleDelete = useCallback(() => {
+    if (window.confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+      deleteDocumentMutation.mutate();
+    }
+  }, [deleteDocumentMutation]);
+
+  // Insert text at cursor
+  const insertTextAtCursor = useCallback((text) => {
+    saveToUndoStack();
+    
+    const editor = editorRef.current;
+    if (editor) {
+      editor.focus();
+      
+      const selection = window.getSelection();
+      let range;
+      
+      if (selection.rangeCount > 0) {
+        range = selection.getRangeAt(0);
+      } else {
+        range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+      }
+      
+      // Create text node
+      const textNode = document.createTextNode('\n\n' + text + '\n\n');
+      range.insertNode(textNode);
+      
+      // Move cursor after inserted text
+      range.setStartAfter(textNode);
+      range.setEndAfter(textNode);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      
+      handleContentChange(editor.innerHTML);
+    }
+  }, [saveToUndoStack, handleContentChange]);
+
+  // Handle editor input
+  const handleEditorInput = useCallback(() => {
+    if (editorRef.current) {
+      handleContentChange(editorRef.current.innerHTML);
+    }
+  }, [handleContentChange]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -190,45 +348,35 @@ const DocumentEditorPage = () => {
           case 'z':
             if (e.shiftKey) {
               e.preventDefault();
-              if (historyIndex < history.length - 1) {
-                setIsUpdatingFromHistory(true);
-                const nextState = history[historyIndex + 1];
-                setContent(nextState.content);
-                setTitle(nextState.title);
-                setHistoryIndex(prev => prev + 1);
-                setTimeout(() => setIsUpdatingFromHistory(false), 100);
-              }
+              handleRedo();
             } else {
               e.preventDefault();
-              if (historyIndex > 0) {
-                setIsUpdatingFromHistory(true);
-                const prevState = history[historyIndex - 1];
-                setContent(prevState.content);
-                setTitle(prevState.title);
-                setHistoryIndex(prev => prev - 1);
-                setTimeout(() => setIsUpdatingFromHistory(false), 100);
-              }
+              handleUndo();
             }
             break;
           case 'y':
             e.preventDefault();
-            if (historyIndex < history.length - 1) {
-              setIsUpdatingFromHistory(true);
-              const nextState = history[historyIndex + 1];
-              setContent(nextState.content);
-              setTitle(nextState.title);
-              setHistoryIndex(prev => prev + 1);
-              setTimeout(() => setIsUpdatingFromHistory(false), 100);
-            }
+            handleRedo();
             break;
           case 's':
             e.preventDefault();
-            if (hasUnsavedChanges) {
-              updateDocumentMutation.mutate({
-                title: title.trim(),
-                content: content
-              });
-            }
+            handleSave();
+            break;
+          case 'b':
+            e.preventDefault();
+            handleBold();
+            break;
+          case 'i':
+            e.preventDefault();
+            handleItalic();
+            break;
+          case 'u':
+            e.preventDefault();
+            handleUnderline();
+            break;
+          case 'h':
+            e.preventDefault();
+            handleHighlight();
             break;
           default:
             break;
@@ -240,118 +388,17 @@ const DocumentEditorPage = () => {
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [historyIndex, history, hasUnsavedChanges, title, content, updateDocumentMutation]);
+  }, [handleUndo, handleRedo, handleSave, handleBold, handleItalic, handleUnderline, handleHighlight]);
 
-  // Auto-save effect
+  // Save to undo stack when content changes (debounced)
   useEffect(() => {
-    if (hasUnsavedChanges && document && !isUpdatingFromHistory) {
-      const timer = setTimeout(() => {
-        handleSave();
-      }, 2000); // Auto-save after 2 seconds of inactivity
+    const timer = setTimeout(() => {
+      saveToUndoStack();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [content, saveToUndoStack]);
 
-      return () => clearTimeout(timer);
-    }
-  }, [title, content, hasUnsavedChanges, isUpdatingFromHistory]);
-
-  // Track changes
-  useEffect(() => {
-    if (document && !isUpdatingFromHistory && (title !== document.title || content !== document.content)) {
-      setHasUnsavedChanges(true);
-    }
-  }, [title, content, document, isUpdatingFromHistory]);
-
-  const handleSave = () => {
-    if (!hasUnsavedChanges) return;
-    
-    updateDocumentMutation.mutate({
-      title: title.trim(),
-      content: content
-    });
-  };
-
-  const handleBold = () => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const selectedText = content.substring(start, end);
-    
-    if (selectedText) {
-      // Wrap selected text in uppercase for emphasis
-      const newText = content.substring(0, start) + selectedText.toUpperCase() + content.substring(end);
-      setContent(newText);
-      
-      // Restore selection
-      setTimeout(() => {
-        editor.focus();
-        editor.setSelectionRange(start, start + selectedText.length);
-      }, 0);
-    }
-  };
-
-  const handleItalic = () => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const selectedText = content.substring(start, end);
-    
-    if (selectedText) {
-      // Add emphasis with underscores
-      const newText = content.substring(0, start) + '_' + selectedText + '_' + content.substring(end);
-      setContent(newText);
-      
-      setTimeout(() => {
-        editor.focus();
-        editor.setSelectionRange(start + 1, end + 1);
-      }, 0);
-    }
-  };
-
-  const handleUnderline = () => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const selectedText = content.substring(start, end);
-    
-    if (selectedText) {
-      // Add underline effect
-      const underline = '─'.repeat(selectedText.length);
-      const newText = content.substring(0, start) + selectedText + '\n' + underline + content.substring(end);
-      setContent(newText);
-      
-      setTimeout(() => {
-        editor.focus();
-        editor.setSelectionRange(start, end);
-      }, 0);
-    }
-  };
-
-  const insertTextAtCursor = (text) => {
-    const editor = editorRef.current;
-    if (editor) {
-      const start = editor.selectionStart;
-      const end = editor.selectionEnd;
-      
-      // Clean the text before inserting
-      const cleanText = text.replace(/[#*`>_]/g, '').replace(/\*\*(.*?)\*\*/g, '$1');
-      
-      const newContent = content.substring(0, start) + '\n\n' + cleanText + '\n\n' + content.substring(end);
-      setContent(newContent);
-      
-      // Set cursor position after inserted text
-      setTimeout(() => {
-        const newPosition = start + cleanText.length + 4;
-        editor.selectionStart = editor.selectionEnd = newPosition;
-        editor.focus();
-      }, 0);
-    }
-  };
-
+  // Handle chat submit
   const handleChatSubmit = (e) => {
     e.preventDefault();
     if (!chatMessage.trim()) return;
@@ -359,6 +406,7 @@ const DocumentEditorPage = () => {
     chatMutation.mutate(chatMessage.trim());
   };
 
+  // Handle quick prompts
   const handleQuickPrompt = (prompt) => {
     generateNotesMutation.mutate(prompt);
   };
@@ -398,7 +446,10 @@ const DocumentEditorPage = () => {
                 <input
                   type="text"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    setHasUnsavedChanges(true);
+                  }}
                   className="text-lg font-medium bg-transparent border-none outline-none focus:bg-gray-50 px-2 py-1 rounded"
                   placeholder="Document title..."
                 />
@@ -410,17 +461,17 @@ const DocumentEditorPage = () => {
               <div className="flex items-center space-x-1 border-r border-gray-200 pr-4">
                 <button
                   onClick={handleUndo}
-                  disabled={historyIndex <= 0}
+                  disabled={undoStack.length <= 1}
                   className="p-2 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Undo"
+                  title="Undo (Ctrl+Z)"
                 >
                   <Undo className="h-4 w-4" />
                 </button>
                 <button
                   onClick={handleRedo}
-                  disabled={historyIndex >= history.length - 1}
+                  disabled={redoStack.length === 0}
                   className="p-2 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Redo"
+                  title="Redo (Ctrl+Y)"
                 >
                   <Redo className="h-4 w-4" />
                 </button>
@@ -431,23 +482,30 @@ const DocumentEditorPage = () => {
                 <button
                   onClick={handleBold}
                   className="p-2 hover:bg-gray-100 rounded transition-colors"
-                  title="Bold (Uppercase)"
+                  title="Bold (Ctrl+B)"
                 >
                   <Bold className="h-4 w-4" />
                 </button>
                 <button
                   onClick={handleItalic}
                   className="p-2 hover:bg-gray-100 rounded transition-colors"
-                  title="Italic (Underscores)"
+                  title="Italic (Ctrl+I)"
                 >
                   <Italic className="h-4 w-4" />
                 </button>
                 <button
                   onClick={handleUnderline}
                   className="p-2 hover:bg-gray-100 rounded transition-colors"
-                  title="Underline"
+                  title="Underline (Ctrl+U)"
                 >
                   <Underline className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={handleHighlight}
+                  className="p-2 hover:bg-gray-100 rounded transition-colors"
+                  title="Highlight (Ctrl+H)"
+                >
+                  <Highlighter className="h-4 w-4" />
                 </button>
               </div>
               
@@ -490,6 +548,19 @@ const DocumentEditorPage = () => {
               </button>
               
               <button
+                onClick={handleDelete}
+                disabled={deleteDocumentMutation.isLoading}
+                className="p-2 hover:bg-red-100 text-red-600 rounded transition-colors disabled:opacity-50"
+                title="Delete Document"
+              >
+                {deleteDocumentMutation.isLoading ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </button>
+              
+              <button
                 onClick={handleSave}
                 disabled={!hasUnsavedChanges || updateDocumentMutation.isLoading}
                 className={`flex items-center space-x-2 px-3 py-2 rounded transition-colors ${
@@ -509,39 +580,40 @@ const DocumentEditorPage = () => {
           </div>
         </div>
 
-        {/* Editor */}
+        {/* Rich Text Editor */}
         <div className="flex-1 p-6">
           <div className="max-w-4xl mx-auto">
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <textarea
+              <div
                 ref={editorRef}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Start writing your document..."
-                className="w-full h-full min-h-[600px] p-6 bg-white rounded-lg border-none resize-none outline-none focus:ring-0"
+                contentEditable
+                onInput={handleEditorInput}
+                className="w-full min-h-[600px] p-6 bg-white rounded-lg border-none resize-none outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                 style={{
                   fontSize: `${fontSize}px`,
                   fontFamily: fontFamily,
                   lineHeight: '1.6',
-                  color: '#374151',
-                  backgroundColor: 'white'
+                  color: '#374151'
                 }}
                 spellCheck="true"
+                suppressContentEditableWarning={true}
+                data-placeholder="Start writing your document..."
               />
             </div>
             
             {/* Status Bar */}
             <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
               <div className="flex items-center space-x-4">
-                <span>{content.length} characters</span>
-                <span>{content.split(/\s+/).filter(word => word.length > 0).length} words</span>
-                <span>{content.split('\n').length} lines</span>
+                <span>{editorRef.current ? editorRef.current.textContent.length : 0} characters</span>
+                <span>{editorRef.current ? editorRef.current.textContent.split(/\s+/).filter(word => word.length > 0).length : 0} words</span>
+                <span>Undo: {undoStack.length - 1}</span>
+                <span>Redo: {redoStack.length}</span>
               </div>
               <div className="flex items-center space-x-2">
                 {hasUnsavedChanges && (
                   <span className="text-orange-500">Unsaved changes</span>
                 )}
-                <span>History: {historyIndex + 1}/{history.length}</span>
+                <span>Select text and use formatting buttons • Rich text editor</span>
               </div>
             </div>
           </div>

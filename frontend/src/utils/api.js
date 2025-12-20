@@ -230,7 +230,8 @@ export const youtubeAPI = {
   }),
   generateFlashcards: (sessionId, count = 10) => api.post(`/youtube/sessions/${sessionId}/flashcards`, { count }),
   explainFlashcard: (sessionId, question, answer) => api.post(`/youtube/sessions/${sessionId}/flashcards/explain`, { question, answer }),
-  generateSlides: (sessionId, count = 5) => api.post(`/youtube/sessions/${sessionId}/slides`, { count })
+  generateSlides: (sessionId, count = 5) => api.post(`/youtube/sessions/${sessionId}/slides`, { count }),
+  generateRelatedVideos: (sessionId, count = 8) => api.post(`/youtube/sessions/${sessionId}/related-videos`, { count })
 };
 
 // Messages API
