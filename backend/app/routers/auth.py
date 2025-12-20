@@ -298,4 +298,47 @@ async def resend_verification(email: str, db = Depends(get_database)):
     
     return {"message": "Verification code resent to your email"}
 
+@router.get("/user/{user_id}")
+async def get_user_by_id(
+    user_id: str,
+    current_user: UserInDB = Depends(get_current_active_user),
+    db = Depends(get_database)
+):
+    """Get user information by ID (for messaging purposes)"""
+    try:
+        from bson import ObjectId
+        
+        # Try to find user
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            user = await db.users.find_one({"_id": user_id})
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Check if user is a teacher and get teacher profile
+        teacher_profile = None
+        if user.get("role") == "teacher":
+            teacher_profile = await db.teacher_profiles.find_one({"user_id": ObjectId(user_id)})
+        
+        # Return user info (use teacher profile info if available)
+        return {
+            "id": str(user["_id"]),
+            "_id": str(user["_id"]),
+            "name": teacher_profile.get("full_name") if teacher_profile else user.get("name", ""),
+            "full_name": teacher_profile.get("full_name") if teacher_profile else user.get("name", ""),
+            "email": user.get("email", ""),
+            "avatar": teacher_profile.get("profile_picture") if teacher_profile else user.get("avatar", ""),
+            "role": user.get("role", "student")
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting user by ID: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get user information"
+        )
 

@@ -14,6 +14,7 @@ import {
   UserCheck,
   Youtube,
   ShoppingBag,
+  Calendar,
   // Settings // Removed unused import
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -62,6 +63,8 @@ const Layout = () => {
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Notes', href: '/notes', icon: BookOpen },
     { name: 'Marketplace', href: '/marketplace', icon: ShoppingBag },
+    { name: 'Find Teachers', href: '/teachers', icon: UserCheck },
+    { name: 'My Sessions', href: '/my-sessions', icon: Calendar },
     { name: 'Messages', href: '/messages', icon: MessageSquare },
     { name: 'YouTube Summarizer', href: '/youtube-summarizer', icon: Youtube },
     { name: 'Friends', href: '/friends', icon: Users },

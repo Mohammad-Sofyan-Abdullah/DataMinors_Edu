@@ -51,18 +51,31 @@ const MessagesPage = () => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // Get friend details
+  // Get friend/user details - first try from friends, then from users endpoint
   const { } = useQuery(
     ['friend', friendId],
-    () => friendsAPI.getFriends().then(response => {
-      const friends = response.data;
-      return friends.find(friend => (friend.id || friend._id) === friendId);
-    }),
+    async () => {
+      try {
+        // Try to get from friends list first
+        const friendsResponse = await friendsAPI.getFriends();
+        const friends = friendsResponse.data;
+        const friend = friends.find(friend => (friend.id || friend._id) === friendId);
+        if (friend) return friend;
+        
+        // If not found in friends, get user info directly (for teachers)
+        const userResponse = await messagesAPI.getUserInfo(friendId);
+        return userResponse.data;
+      } catch (error) {
+        console.error('Error fetching user info:', error);
+        // Return basic info if all else fails
+        return { id: friendId, name: 'User', full_name: 'User' };
+      }
+    },
     {
       enabled: !!friendId,
-      onSuccess: (friend) => {
-        if (friend) {
-          setFriendInfo(friend);
+      onSuccess: (userInfo) => {
+        if (userInfo) {
+          setFriendInfo(userInfo);
         }
       }
     }

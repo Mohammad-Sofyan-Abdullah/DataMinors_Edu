@@ -5,7 +5,9 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import RoleProtectedRoute from './components/RoleProtectedRoute';
 import Layout from './components/Layout';
+import TeacherLayout from './components/TeacherLayout';
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -16,11 +18,21 @@ import ProfilePage from './pages/ProfilePage';
 import FriendsPage from './pages/FriendsPage';
 import FriendRequestsPage from './pages/FriendRequestsPage';
 import MessagesPage from './pages/MessagesPage';
+import ConversationsListPage from './pages/ConversationsListPage';
 import YouTubeSummarizerLayout from './pages/YouTubeSummarizerLayout';
 import MarketplacePage from './pages/MarketplacePage';
 import NotesPage from './pages/NotesPage';
 import DocumentEditorPage from './pages/DocumentEditorPage';
 import DocumentSessionPage from './pages/DocumentSessionPage';
+import TeacherRegisterPage from './pages/TeacherRegisterPage';
+import TeacherProfileSetupPage from './pages/TeacherProfileSetupPage';
+import TeacherDashboardPage from './pages/TeacherDashboardPage';
+import TeachersDiscoveryPage from './pages/TeachersDiscoveryPage';
+import TeacherProfileViewPage from './pages/TeacherProfileViewPage';
+import MyHireRequestsPage from './pages/MyHireRequestsPage';
+import TeacherSessionsPage from './pages/TeacherSessionsPage';
+import TeacherReviewsPage from './pages/TeacherReviewsPage';
+import StudentSessionsPage from './pages/StudentSessionsPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -45,9 +57,41 @@ function App() {
                 <Route path="/register" element={<RegisterPage />} />
 
                 {/* Protected routes */}
+                <Route path="/teacher/register" element={<TeacherRegisterPage />} />
+
+                {/* Teacher Setup (Protected) */}
+                <Route path="/teacher/profile-setup" element={
+                  <ProtectedRoute>
+                    <RoleProtectedRoute allowedRole="teacher">
+                      <TeacherProfileSetupPage />
+                    </RoleProtectedRoute>
+                  </ProtectedRoute>
+                } />
+
+                {/* Teacher Routes with Teacher Layout */}
+                <Route path="/teacher" element={
+                  <ProtectedRoute>
+                    <RoleProtectedRoute allowedRole="teacher">
+                      <TeacherLayout />
+                    </RoleProtectedRoute>
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Navigate to="/teacher/dashboard" replace />} />
+                  <Route path="dashboard" element={<TeacherDashboardPage />} />
+                  <Route path="profile/edit" element={<TeacherProfileSetupPage />} />
+                  <Route path="messages" element={<ConversationsListPage />} />
+                  <Route path="messages/:friendId" element={<MessagesPage />} />
+                  <Route path="sessions" element={<TeacherSessionsPage />} />
+                  <Route path="earnings" element={<TeacherDashboardPage />} />
+                  <Route path="reviews" element={<TeacherReviewsPage />} />
+                </Route>
+
+                {/* Student Routes with Student Layout */}
                 <Route path="/" element={
                   <ProtectedRoute>
-                    <Layout />
+                    <RoleProtectedRoute allowedRole="student">
+                      <Layout />
+                    </RoleProtectedRoute>
                   </ProtectedRoute>
                 }>
                   <Route index element={<Navigate to="/dashboard" replace />} />
@@ -61,8 +105,14 @@ function App() {
                   <Route path="profile" element={<ProfilePage />} />
                   <Route path="friends" element={<FriendsPage />} />
                   <Route path="friend-requests" element={<FriendRequestsPage />} />
-                  <Route path="messages" element={<MessagesPage />} />
+                  <Route path="messages" element={<ConversationsListPage />} />
                   <Route path="messages/:friendId" element={<MessagesPage />} />
+
+                  {/* Teacher Discovery - accessible to students */}
+                  <Route path="teachers" element={<TeachersDiscoveryPage />} />
+                  <Route path="teachers/:teacherId" element={<TeacherProfileViewPage />} />
+                  <Route path="my-hire-requests" element={<MyHireRequestsPage />} />
+                  <Route path="my-sessions" element={<StudentSessionsPage />} />
                 </Route>
 
                 {/* Catch all route */}
