@@ -16,7 +16,9 @@ import {
   Undo,
   Redo,
   Highlighter,
-  Trash2
+  Trash2,
+  RefreshCw,
+  Camera
 } from 'lucide-react';
 import { notesAPI } from '../utils/api';
 import toast from 'react-hot-toast';
@@ -87,7 +89,22 @@ const DocumentEditorPage = () => {
     }
   );
 
-  // Delete document mutation
+  // Reprocess OCR mutation
+  const reprocessOCRMutation = useMutation(
+    () => notesAPI.reprocessWithOCR(documentId),
+    {
+      onSuccess: (response) => {
+        toast.success('Document reprocessed with OCR successfully');
+        queryClient.invalidateQueries(['document', documentId]);
+        // Refresh the page to show updated content
+        window.location.reload();
+      },
+      onError: (error) => {
+        const errorMessage = error.response?.data?.detail || 'Failed to reprocess document';
+        toast.error(errorMessage);
+      }
+    }
+  );
   const deleteDocumentMutation = useMutation(
     () => notesAPI.deleteDocument(documentId),
     {
@@ -546,6 +563,28 @@ const DocumentEditorPage = () => {
               >
                 <MessageSquare className="h-5 w-5" />
               </button>
+              
+              {/* OCR Reprocess Button - Show for images, videos, or failed extractions */}
+              {document && (
+                (document.file_name && (
+                  /\.(jpg|jpeg|png|bmp|tiff|tif|webp|gif|mp4|avi|mov|mkv|wmv|flv|webm|m4v)$/i.test(document.file_name) ||
+                  document.extraction_method?.includes('failed') ||
+                  document.content?.includes('extraction failed')
+                )) && (
+                  <button
+                    onClick={() => reprocessOCRMutation.mutate()}
+                    disabled={reprocessOCRMutation.isLoading}
+                    className="p-2 hover:bg-green-100 text-green-600 rounded transition-colors disabled:opacity-50"
+                    title="Reprocess with OCR"
+                  >
+                    {reprocessOCRMutation.isLoading ? (
+                      <Loader className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
+                  </button>
+                )
+              )}
               
               <button
                 onClick={handleDelete}

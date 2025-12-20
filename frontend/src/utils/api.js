@@ -303,6 +303,7 @@ export const notesAPI = {
   updateDocument: (documentId, documentData) => api.put(`/notes/documents/${documentId}`, documentData),
   deleteDocument: (documentId) => api.delete(`/notes/documents/${documentId}`),
   uploadDocument: (formData) => api.post('/notes/documents/upload', formData),
+  reprocessWithOCR: (documentId) => api.post(`/notes/documents/${documentId}/reprocess-ocr`),
   chatWithDocument: (documentId, message) => api.post(`/notes/documents/${documentId}/chat`, { message }),
   generateNotes: (documentId, prompt) => api.post(`/notes/documents/${documentId}/generate-notes`, { prompt }),
   getChatHistory: (documentId) => api.get(`/notes/documents/${documentId}/chat-history`),

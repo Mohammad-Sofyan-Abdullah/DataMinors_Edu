@@ -482,17 +482,22 @@ const NotesPage = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Select File
                     </label>
                     <input
                       type="file"
-                      accept=".txt,.docx,.doc,.pdf"
+                      accept=".txt,.docx,.doc,.pdf,.ppt,.pptx,.jpg,.jpeg,.png,.bmp,.tiff,.tif,.webp,.gif,.mp4,.avi,.mov,.mkv,.wmv,.flv,.webm,.m4v,.xls,.xlsx,.csv,.rtf,.odp,.ods"
                       onChange={(e) => setUploadFile(e.target.files[0])}
                       className="input w-full"
                     />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Supported formats: TXT, DOCX, DOC, PDF
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      <strong>Supported formats:</strong> Documents (TXT, DOCX, PDF, RTF), Presentations (PPT, PPTX), 
+                      Images (JPG, PNG, etc.), Videos (MP4, AVI, etc.), Spreadsheets (XLS, CSV)
+                      <br />
+                      <span className="text-blue-600 dark:text-blue-400 font-medium">
+                        📷 Images and videos will be processed using AI OCR to extract text
+                      </span>
                     </p>
                   </div>
                 </div>
