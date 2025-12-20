@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { motion } from 'framer-motion';
@@ -6,13 +6,20 @@ import {
   ArrowLeft,
   Save,
   Bold,
+  Italic,
+  Underline,
   Type,
   MessageSquare,
   Send,
   Loader,
   FileText,
   Sparkles,
-  History
+  History,
+  Undo,
+  Redo,
+  AlignLeft,
+  AlignCenter,
+  AlignRight
 } from 'lucide-react';
 import { notesAPI } from '../utils/api';
 import toast from 'react-hot-toast';
@@ -32,6 +39,11 @@ const DocumentEditorPage = () => {
   const [fontSize, setFontSize] = useState('16');
   const [fontFamily, setFontFamily] = useState('Inter');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Undo/Redo functionality
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [isUpdatingFromHistory, setIsUpdatingFromHistory] = useState(false);
 
   // Fetch document
   const { data: document, isLoading } = useQuery(
@@ -102,23 +114,151 @@ const DocumentEditorPage = () => {
     }
   );
 
+  // Initialize history when document loads
+  useEffect(() => {
+    if (document && content && history.length === 0) {
+      setHistory([{ content, title }]);
+      setHistoryIndex(0);
+    }
+  }, [document, content, title, history.length]);
+
+  // Add to history when content changes (debounced)
+  const addToHistory = useCallback((newContent, newTitle) => {
+    if (isUpdatingFromHistory) return;
+    
+    const newState = { content: newContent, title: newTitle };
+    const currentState = history[historyIndex];
+    
+    // Don't add if content is the same
+    if (currentState && currentState.content === newContent && currentState.title === newTitle) {
+      return;
+    }
+    
+    // Remove any future history if we're not at the end
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(newState);
+    
+    // Limit history to 50 entries
+    if (newHistory.length > 50) {
+      newHistory.shift();
+    } else {
+      setHistoryIndex(prev => prev + 1);
+    }
+    
+    setHistory(newHistory);
+  }, [history, historyIndex, isUpdatingFromHistory]);
+
+  // Debounced history update
+  useEffect(() => {
+    if (!isUpdatingFromHistory && (content || title)) {
+      const timer = setTimeout(() => {
+        addToHistory(content, title);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [content, title, addToHistory, isUpdatingFromHistory]);
+
+  // Undo function
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      setIsUpdatingFromHistory(true);
+      const prevState = history[historyIndex - 1];
+      setContent(prevState.content);
+      setTitle(prevState.title);
+      setHistoryIndex(prev => prev - 1);
+      setTimeout(() => setIsUpdatingFromHistory(false), 100);
+    }
+  };
+
+  // Redo function
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      setIsUpdatingFromHistory(true);
+      const nextState = history[historyIndex + 1];
+      setContent(nextState.content);
+      setTitle(nextState.title);
+      setHistoryIndex(prev => prev + 1);
+      setTimeout(() => setIsUpdatingFromHistory(false), 100);
+    }
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case 'z':
+            if (e.shiftKey) {
+              e.preventDefault();
+              if (historyIndex < history.length - 1) {
+                setIsUpdatingFromHistory(true);
+                const nextState = history[historyIndex + 1];
+                setContent(nextState.content);
+                setTitle(nextState.title);
+                setHistoryIndex(prev => prev + 1);
+                setTimeout(() => setIsUpdatingFromHistory(false), 100);
+              }
+            } else {
+              e.preventDefault();
+              if (historyIndex > 0) {
+                setIsUpdatingFromHistory(true);
+                const prevState = history[historyIndex - 1];
+                setContent(prevState.content);
+                setTitle(prevState.title);
+                setHistoryIndex(prev => prev - 1);
+                setTimeout(() => setIsUpdatingFromHistory(false), 100);
+              }
+            }
+            break;
+          case 'y':
+            e.preventDefault();
+            if (historyIndex < history.length - 1) {
+              setIsUpdatingFromHistory(true);
+              const nextState = history[historyIndex + 1];
+              setContent(nextState.content);
+              setTitle(nextState.title);
+              setHistoryIndex(prev => prev + 1);
+              setTimeout(() => setIsUpdatingFromHistory(false), 100);
+            }
+            break;
+          case 's':
+            e.preventDefault();
+            if (hasUnsavedChanges) {
+              updateDocumentMutation.mutate({
+                title: title.trim(),
+                content: content
+              });
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [historyIndex, history, hasUnsavedChanges, title, content, updateDocumentMutation]);
+
   // Auto-save effect
   useEffect(() => {
-    if (hasUnsavedChanges && document) {
+    if (hasUnsavedChanges && document && !isUpdatingFromHistory) {
       const timer = setTimeout(() => {
         handleSave();
       }, 2000); // Auto-save after 2 seconds of inactivity
 
       return () => clearTimeout(timer);
     }
-  }, [title, content, hasUnsavedChanges]);
+  }, [title, content, hasUnsavedChanges, isUpdatingFromHistory]);
 
   // Track changes
   useEffect(() => {
-    if (document && (title !== document.title || content !== document.content)) {
+    if (document && !isUpdatingFromHistory && (title !== document.title || content !== document.content)) {
       setHasUnsavedChanges(true);
     }
-  }, [title, content, document]);
+  }, [title, content, document, isUpdatingFromHistory]);
 
   const handleSave = () => {
     if (!hasUnsavedChanges) return;
@@ -130,16 +270,64 @@ const DocumentEditorPage = () => {
   };
 
   const handleBold = () => {
-    const selection = window.getSelection();
-    if (selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const selectedText = range.toString();
-      if (selectedText) {
-        const boldText = `**${selectedText}**`;
-        range.deleteContents();
-        range.insertNode(document.createTextNode(boldText));
-        setHasUnsavedChanges(true);
-      }
+    const editor = editorRef.current;
+    if (!editor) return;
+    
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const selectedText = content.substring(start, end);
+    
+    if (selectedText) {
+      // Wrap selected text in uppercase for emphasis
+      const newText = content.substring(0, start) + selectedText.toUpperCase() + content.substring(end);
+      setContent(newText);
+      
+      // Restore selection
+      setTimeout(() => {
+        editor.focus();
+        editor.setSelectionRange(start, start + selectedText.length);
+      }, 0);
+    }
+  };
+
+  const handleItalic = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const selectedText = content.substring(start, end);
+    
+    if (selectedText) {
+      // Add emphasis with underscores
+      const newText = content.substring(0, start) + '_' + selectedText + '_' + content.substring(end);
+      setContent(newText);
+      
+      setTimeout(() => {
+        editor.focus();
+        editor.setSelectionRange(start + 1, end + 1);
+      }, 0);
+    }
+  };
+
+  const handleUnderline = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const selectedText = content.substring(start, end);
+    
+    if (selectedText) {
+      // Add underline effect
+      const underline = '─'.repeat(selectedText.length);
+      const newText = content.substring(0, start) + selectedText + '\n' + underline + content.substring(end);
+      setContent(newText);
+      
+      setTimeout(() => {
+        editor.focus();
+        editor.setSelectionRange(start, end);
+      }, 0);
     }
   };
 
@@ -148,12 +336,17 @@ const DocumentEditorPage = () => {
     if (editor) {
       const start = editor.selectionStart;
       const end = editor.selectionEnd;
-      const newContent = content.substring(0, start) + '\n\n' + text + '\n\n' + content.substring(end);
+      
+      // Clean the text before inserting
+      const cleanText = text.replace(/[#*`>_]/g, '').replace(/\*\*(.*?)\*\*/g, '$1');
+      
+      const newContent = content.substring(0, start) + '\n\n' + cleanText + '\n\n' + content.substring(end);
       setContent(newContent);
       
       // Set cursor position after inserted text
       setTimeout(() => {
-        editor.selectionStart = editor.selectionEnd = start + text.length + 4;
+        const newPosition = start + cleanText.length + 4;
+        editor.selectionStart = editor.selectionEnd = newPosition;
         editor.focus();
       }, 0);
     }
@@ -213,15 +406,53 @@ const DocumentEditorPage = () => {
             </div>
             
             <div className="flex items-center space-x-4">
+              {/* Undo/Redo Controls */}
+              <div className="flex items-center space-x-1 border-r border-gray-200 pr-4">
+                <button
+                  onClick={handleUndo}
+                  disabled={historyIndex <= 0}
+                  className="p-2 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Undo"
+                >
+                  <Undo className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={handleRedo}
+                  disabled={historyIndex >= history.length - 1}
+                  className="p-2 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Redo"
+                >
+                  <Redo className="h-4 w-4" />
+                </button>
+              </div>
+              
               {/* Formatting Controls */}
-              <div className="flex items-center space-x-2 border-r border-gray-200 pr-4">
+              <div className="flex items-center space-x-1 border-r border-gray-200 pr-4">
                 <button
                   onClick={handleBold}
                   className="p-2 hover:bg-gray-100 rounded transition-colors"
-                  title="Bold"
+                  title="Bold (Uppercase)"
                 >
                   <Bold className="h-4 w-4" />
                 </button>
+                <button
+                  onClick={handleItalic}
+                  className="p-2 hover:bg-gray-100 rounded transition-colors"
+                  title="Italic (Underscores)"
+                >
+                  <Italic className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={handleUnderline}
+                  className="p-2 hover:bg-gray-100 rounded transition-colors"
+                  title="Underline"
+                >
+                  <Underline className="h-4 w-4" />
+                </button>
+              </div>
+              
+              {/* Font Controls */}
+              <div className="flex items-center space-x-2 border-r border-gray-200 pr-4">
                 <select
                   value={fontSize}
                   onChange={(e) => setFontSize(e.target.value)}
@@ -244,6 +475,7 @@ const DocumentEditorPage = () => {
                   <option value="Times New Roman">Times New Roman</option>
                   <option value="Georgia">Georgia</option>
                   <option value="Courier New">Courier New</option>
+                  <option value="Roboto">Roboto</option>
                 </select>
               </div>
               
@@ -280,18 +512,38 @@ const DocumentEditorPage = () => {
         {/* Editor */}
         <div className="flex-1 p-6">
           <div className="max-w-4xl mx-auto">
-            <textarea
-              ref={editorRef}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Start writing your document..."
-              className="w-full h-full min-h-[600px] p-6 bg-white rounded-lg border border-gray-200 resize-none outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              style={{
-                fontSize: `${fontSize}px`,
-                fontFamily: fontFamily,
-                lineHeight: '1.6'
-              }}
-            />
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <textarea
+                ref={editorRef}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Start writing your document..."
+                className="w-full h-full min-h-[600px] p-6 bg-white rounded-lg border-none resize-none outline-none focus:ring-0"
+                style={{
+                  fontSize: `${fontSize}px`,
+                  fontFamily: fontFamily,
+                  lineHeight: '1.6',
+                  color: '#374151',
+                  backgroundColor: 'white'
+                }}
+                spellCheck="true"
+              />
+            </div>
+            
+            {/* Status Bar */}
+            <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+              <div className="flex items-center space-x-4">
+                <span>{content.length} characters</span>
+                <span>{content.split(/\s+/).filter(word => word.length > 0).length} words</span>
+                <span>{content.split('\n').length} lines</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                {hasUnsavedChanges && (
+                  <span className="text-orange-500">Unsaved changes</span>
+                )}
+                <span>History: {historyIndex + 1}/{history.length}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
