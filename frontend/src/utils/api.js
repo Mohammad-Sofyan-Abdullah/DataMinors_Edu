@@ -213,7 +213,8 @@ export const youtubeAPI = {
     responseType: 'blob'
   }),
   generateFlashcards: (sessionId, count = 10) => api.post(`/youtube/sessions/${sessionId}/flashcards`, { count }),
-  explainFlashcard: (sessionId, question, answer) => api.post(`/youtube/sessions/${sessionId}/flashcards/explain`, { question, answer })
+  explainFlashcard: (sessionId, question, answer) => api.post(`/youtube/sessions/${sessionId}/flashcards/explain`, { question, answer }),
+  generateRelatedVideos: (sessionId, count = 8) => api.post(`/youtube/sessions/${sessionId}/related-videos`, { count })
 };
 
 // Messages API

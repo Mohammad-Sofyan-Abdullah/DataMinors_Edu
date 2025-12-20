@@ -19,7 +19,11 @@ import {
   X,
   MessageSquare,
   BookOpen,
-  Layers
+  Layers,
+  ExternalLink,
+  Clock,
+  Star,
+  TrendingUp
 } from 'lucide-react';
 import { youtubeAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,11 +40,13 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [activeTab, setActiveTab] = useState('chat'); // 'chat', 'summaries', 'flashcards'
+  const [activeTab, setActiveTab] = useState('chat'); // 'chat', 'summaries', 'flashcards', 'related-videos'
   const [flashcards, setFlashcards] = useState([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   const [isExplainingCard, setIsExplainingCard] = useState(false);
+  const [relatedVideos, setRelatedVideos] = useState([]);
+  const [isGeneratingRelatedVideos, setIsGeneratingRelatedVideos] = useState(false);
 
   // Fetch all sessions
   const { } = useQuery(
@@ -63,6 +69,7 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
       select: (response) => response.data,
       enabled: !!selectedSessionId,
       onSuccess: (data) => {
+        console.log('Session data loaded:', data);
         setSelectedSession(data);
         // Always update flashcards based on the current session
         if (data.flashcards && data.flashcards.length > 0) {
@@ -70,6 +77,15 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
         } else {
           // Clear flashcards if the current session doesn't have any
           setFlashcards([]);
+        }
+        // Update related videos based on the current session
+        if (data.related_videos && data.related_videos.length > 0) {
+          console.log('Loading related videos from session:', data.related_videos);
+          setRelatedVideos(data.related_videos);
+        } else {
+          // Clear related videos if the current session doesn't have any
+          console.log('No related videos in session, clearing state');
+          setRelatedVideos([]);
         }
         // Reset to first card when switching sessions
         setCurrentCardIndex(0);
@@ -266,6 +282,42 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
   const handlePreviousCard = () => {
     if (currentCardIndex > 0) {
       setCurrentCardIndex(currentCardIndex - 1);
+    }
+  };
+
+  const handleGenerateRelatedVideos = async () => {
+    if (!selectedSessionId) return;
+    
+    setIsGeneratingRelatedVideos(true);
+    try {
+      console.log('Starting related videos generation...');
+      const response = await youtubeAPI.generateRelatedVideos(selectedSessionId, 8);
+      console.log('Full API response:', response);
+      console.log('Response data:', response.data);
+      console.log('Related videos from API:', response.data.related_videos);
+      
+      // Immediately update the state with the generated videos
+      const generatedVideos = response.data.related_videos || [];
+      console.log('Setting relatedVideos state to:', generatedVideos);
+      setRelatedVideos(generatedVideos);
+      
+      // Force a state update by setting a temporary value first
+      setRelatedVideos([]);
+      setTimeout(() => {
+        setRelatedVideos(generatedVideos);
+      }, 100);
+      
+      const count = response.data.count;
+      toast.success(`Generated ${count} related video suggestion${count !== 1 ? 's' : ''}!`);
+      
+      // Also invalidate the query to update the session data
+      queryClient.invalidateQueries(['youtube-session', selectedSessionId]);
+      
+    } catch (error) {
+      toast.error('Failed to generate related videos');
+      console.error('Error generating related videos:', error);
+    } finally {
+      setIsGeneratingRelatedVideos(false);
     }
   };
 
@@ -530,6 +582,22 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setActiveTab('related-videos')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'related-videos'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <TrendingUp size={18} />
+              Related Videos
+              {relatedVideos.length > 0 && (
+                <span className="ml-1 px-2 py-0.5 text-xs bg-blue-600 text-white rounded-full">
+                  {relatedVideos.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -771,6 +839,142 @@ const YouTubeSummarizerPage = ({ selectedSessionId, onSessionSelect, isSidebarOp
                         className="text-sm text-gray-600 hover:text-gray-900 underline disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isGeneratingFlashcards ? 'Regenerating...' : 'Regenerate Flashcards'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Related Videos Tab */}
+          {activeTab === 'related-videos' && (
+            <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-gray-50 to-gray-100">
+              <div className="max-w-6xl mx-auto">
+                {(relatedVideos.length === 0 && (!selectedSession?.related_videos || selectedSession.related_videos.length === 0)) ? (
+                  <div className="text-center py-12">
+                    <div className="mx-auto w-20 h-20 bg-gradient-to-br from-red-100 to-orange-100 rounded-full flex items-center justify-center mb-6">
+                      <TrendingUp className="h-10 w-10 text-red-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                      Discover Related Videos
+                    </h2>
+                    <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                      Get AI-curated YouTube video suggestions to deepen your understanding and prepare for exams. Perfect for comprehensive learning.
+                    </p>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        console.log('Current relatedVideos state:', relatedVideos);
+                        handleGenerateRelatedVideos();
+                      }}
+                      disabled={isGeneratingRelatedVideos}
+                      className="px-8 py-4 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 mx-auto"
+                    >
+                      {isGeneratingRelatedVideos ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          Finding Related Videos...
+                        </>
+                      ) : (
+                        <>
+                          <TrendingUp className="h-5 w-5" />
+                          Find Related Videos
+                        </>
+                      )}
+                    </motion.button>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="text-center mb-8">
+                      <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                        Related Videos for Further Study
+                      </h2>
+                      <p className="text-gray-600">
+                        AI-curated video suggestions to enhance your learning journey
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {(relatedVideos.length > 0 ? relatedVideos : selectedSession?.related_videos || []).map((video, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border border-gray-200 overflow-hidden"
+                        >
+                          <div className="p-6">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex items-center space-x-2">
+                                <div className="p-2 bg-red-100 rounded-lg">
+                                  <PlayCircle className="h-4 w-4 text-red-600" />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                    video.difficulty === 'Beginner' ? 'bg-green-100 text-green-800' :
+                                    video.difficulty === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-red-100 text-red-800'
+                                  }`}>
+                                    {video.difficulty}
+                                  </span>
+                                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                                    {video.category}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <h3 className="font-semibold text-gray-900 mb-3 line-clamp-2 leading-tight">
+                              {video.title}
+                            </h3>
+                            
+                            <p className="text-sm text-gray-600 mb-4 line-clamp-3">
+                              {video.description}
+                            </p>
+                            
+                            <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
+                              <div className="flex items-center space-x-1">
+                                <Clock className="h-3 w-3" />
+                                <span>{video.estimated_duration}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Star className="h-3 w-3" />
+                                <span>Recommended</span>
+                              </div>
+                            </div>
+                            
+                            <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                              <p className="text-xs text-blue-800 font-medium mb-1">Why this helps:</p>
+                              <p className="text-xs text-blue-700 line-clamp-2">
+                                {video.why_relevant}
+                              </p>
+                            </div>
+                            
+                            <button
+                              onClick={() => {
+                                const searchQuery = encodeURIComponent(video.title);
+                                window.open(`https://www.youtube.com/results?search_query=${searchQuery}`, '_blank');
+                              }}
+                              className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                            >
+                              <Youtube className="h-4 w-4" />
+                              <span>Search on YouTube</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    <div className="text-center mt-8">
+                      <button
+                        onClick={handleGenerateRelatedVideos}
+                        disabled={isGeneratingRelatedVideos}
+                        className="text-sm text-gray-600 hover:text-gray-900 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isGeneratingRelatedVideos ? 'Generating...' : 'Generate New Suggestions'}
                       </button>
                     </div>
                   </div>

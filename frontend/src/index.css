@@ -157,6 +157,68 @@
   background: #94a3b8;
 }
 
+/* ContentEditable Editor Styles */
+[contenteditable="true"] {
+  outline: none;
+}
+
+[contenteditable="true"]:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+[contenteditable="true"] strong {
+  font-weight: bold;
+}
+
+[contenteditable="true"] em {
+  font-style: italic;
+}
+
+[contenteditable="true"] u {
+  text-decoration: underline;
+}
+
+[contenteditable="true"] mark {
+  background-color: #ffff00;
+  padding: 0 2px;
+}
+
+[contenteditable="true"] p {
+  margin: 0.5em 0;
+}
+
+[contenteditable="true"] br {
+  line-height: 1.6;
+}
+
+/* Ensure proper focus styles */
+[contenteditable="true"]:focus {
+  outline: none;
+}
+
+/* Selection styles */
+[contenteditable="true"]::selection {
+  background-color: #3b82f6;
+  color: white;
+}
+
+/* Line clamp utilities */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* Loading animation */
 .loading-dots {
   display: inline-block;
